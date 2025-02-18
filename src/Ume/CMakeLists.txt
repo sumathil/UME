@@ -52,9 +52,11 @@ add_library(Ume
   utils.cc
   )
 
+
 set_target_properties(Ume PROPERTIES
   COMPILE_DEFINITIONS "${COMMON_COMPILE_DEFINITIONS}"
   COMPILE_OPTIONS "${COMMON_COMPILE_OPTIONS}"
+  CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --expt-relaxed-constexpr"
   OUTPUT_NAME "ume"
   )
 
@@ -67,7 +69,9 @@ target_include_directories(Ume
 target_link_libraries(Ume
   PUBLIC
   ${COMMON_LINK_LIBRARIES}
-  )
+  PUBLIC
+    Kokkos::kokkos
+    )
 
 target_compile_options(Ume
   PRIVATE ${WARNING_FLAGS}
