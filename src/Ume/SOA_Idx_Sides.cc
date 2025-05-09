@@ -129,7 +129,7 @@ bool Sides::VAR_side_surf::init_() const {
 
   /*
    * This for loop is converted to kokkos parallel_for
-   *
+   */
   for (int s = 0; s < sl; ++s) {
     if (smask[s] > 0) {
       // A real side in the interior of the mesh
@@ -149,32 +149,32 @@ bool Sides::VAR_side_surf::init_() const {
     } else
       side_surf[s] = 0.0;
   }
-  */
+  
 
 
   /*
    * Naive kokkos parallel_for
-   */
+   *
   Kokkos::parallel_for("VAR_side_surf", sl, KOKKOS_LAMBDA (const int s) {
       if (smask[s] > 0) {
       // A real side in the interior of the mesh
       Vec3 const &zc = zx[s2z[s]];
       Vec3 const &ep = ex[s2e[s]];
       Vec3 const &fp = fx[s2f[s]];
-      /* Area-weighted normal of triangle <ep, fp, zc>.  The corners that
-         intersect this side share a face in the plane of that triangle. */
+       Area-weighted normal of triangle <ep, fp, zc>.  The corners that
+         intersect this side share a face in the plane of that triangle. 
       side_surf[s] = crossprod(ep - zc, fp - zc) / 2.0;
-    } else if (smask[s] < 0) {
+    } else if (smask[s] < 0) {*/
       /* A ghost side on a mesh boundary face.  There isn't really a zx here, so
          we compute it differently */
-      Vec3 const &fc = fx[s2f[s]];
+      /*Vec3 const &fc = fx[s2f[s]];
       Vec3 const &p1 = px[s2p1[s]];
       Vec3 const &p2 = px[s2p2[s]];
       side_surf[s] = crossprod(p1 - fc, p2 - fc) / 4.0; // Deliberate
     } else
       side_surf[s] = 0.0;
 
-   });
+   });*/
 
   sides().scatter(side_surf);
   VAR_INIT_EPILOGUE;
@@ -200,7 +200,7 @@ bool Sides::VAR_side_surz::init_() const {
 
   /*
    * This for loop is converted to kokkos parallel_for
-   *
+   */
   for (int s = 0; s < sl; ++s) {
     if (smask[s]) {
       // A non-ghost side
@@ -212,12 +212,12 @@ bool Sides::VAR_side_surz::init_() const {
     } else
       side_surz[s] = 0.0;
   }
-  */
+  
 
   /*
    * Naive kokkos parallel_for
    */
-  Kokkos::parallel_for("VAR_side_surz", sl, KOKKOS_LAMBDA (const int s) {
+  /*Kokkos::parallel_for("VAR_side_surz", sl, KOKKOS_LAMBDA (const int s) {
     if (smask[s]) {
       // A non-ghost side
       Vec3 const &fc = fx[s2f[s]]; // 0
@@ -227,7 +227,7 @@ bool Sides::VAR_side_surz::init_() const {
       side_surz[s] = crossprod(p2 - fc, p1 - fc) / 2.0;
     } else
       side_surz[s] = 0.0;
-  });
+  });*/
 
 
   sides().scatter(side_surz);

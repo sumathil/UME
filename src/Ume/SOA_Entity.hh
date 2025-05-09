@@ -125,7 +125,7 @@ struct Entity {
   std::vector<Subset> subsets;
 
   //! Return the number of elements in this Entity
-  constexpr int size() const { return static_cast<int>(mask.size()); }
+  int size() const { return static_cast<int>(mask.size()); }
   constexpr int local_size() const { return lsize_; }
 
   /* Have to wait until clang can support this

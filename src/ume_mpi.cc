@@ -89,6 +89,7 @@ int main(int argc, char *argv[]) {
   if (comm.pe() == 0)
     std::cout << "Calculating gradient..." << std::endl;
 
+Kokkos::initialize(argc, argv); 
   VEC3V_T pgrad, zgrad;
   Ume::Timer orig_time;
   Ume::gradzatz(mesh, zfield, zgrad, pgrad);
@@ -102,6 +103,7 @@ int main(int argc, char *argv[]) {
   invert_time.start();
   Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert);
   invert_time.stop();
+Kokkos::finalize();
 
   // Double check that the gradients are non-zero where we expect
   if (comm.pe() == 0) {
