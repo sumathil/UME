@@ -46,6 +46,7 @@ int main(int argc, char *argv[]) {
 
   Ume::SOA_Idx::Mesh mesh;
 
+  
   /* We need to instantiated the MPI Transport in order to get the PE number
      used to form our filename, */
   Ume::Comm::MPI comm(&argc, &argv);
@@ -88,7 +89,8 @@ int main(int argc, char *argv[]) {
   // Create a zone-field that is zero everywhere but in czi.
   DBLV_T zfield(mesh.zones.size(), 0.0);
   zfield[czi] = 100000.0;
-
+   
+  
   // Do a zone-centered gradient calculation on that field (in parallel)
   if (comm.pe() == 0)
     std::cout << "Calculating gradient..." << std::endl;
@@ -187,6 +189,7 @@ bool read_mesh(
   }
   mesh.read(is);
   is.close();
+  mesh.print_stats(std::cout);
   return true;
 }
 
