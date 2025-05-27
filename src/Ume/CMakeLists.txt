@@ -28,6 +28,7 @@ set(UME_INCLUDE_FILES
   SOA_Idx_Zones.hh
   Timer.hh
   VecN.hh
+  face_area.hh
   gradient.hh
   soa_idx_helpers.hh
   utils.hh
@@ -48,10 +49,17 @@ add_library(Ume
   SOA_Idx_Points.cc
   SOA_Idx_Sides.cc
   SOA_Idx_Zones.cc
+<<<<<<< HEAD
   gradient-allkokkos_cpu.cc
   #gradient-ivtp-cuda.cc
   #gradient-point+zone-cuda.cc
   #gradient.cc
+||||||| 72a22ae
+  gradient.cc
+=======
+  face_area.cc
+  gradient.cc
+>>>>>>> sl/ume_update
   utils.cc
   )
 
@@ -68,6 +76,12 @@ target_include_directories(Ume
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:include/Ume>
   )
+
+if (USE_CALIPER)
+  target_include_directories(Ume PUBLIC ${caliper_INCLUDE_DIR})
+  target_compile_definitions(Ume PUBLIC USE_CALI)
+  target_link_libraries(Ume PUBLIC caliper)
+endif()
 
 target_link_libraries(Ume
   PUBLIC
