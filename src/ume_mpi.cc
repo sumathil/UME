@@ -138,15 +138,9 @@ Kokkos::initialize(argc, argv);
   Ume::Timer orig_time;
   Ume::gradzatz(mesh, zfield, zgrad, pgrad, 0);
   orig_time.start();
-<<<<<<< HEAD
   for (size_t i=0;i<ic;i++){
-  Ume::gradzatz(mesh, zfield, zgrad, pgrad);
-  }
-||||||| 72a22ae
-  Ume::gradzatz(mesh, zfield, zgrad, pgrad);
-=======
   Ume::gradzatz(mesh, zfield, zgrad, pgrad, 1);
->>>>>>> sl/ume_update
+  }
   orig_time.stop();
 
   double vm, rss;
@@ -157,15 +151,9 @@ Kokkos::initialize(argc, argv);
   Ume::Timer invert_time;
   Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert, 0);
   invert_time.start();
-<<<<<<< HEAD
   for (size_t i=0;i<ic;i++){
-  Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert);
-  }
-||||||| 72a22ae
-  Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert);
-=======
   Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert, 1);
->>>>>>> sl/ume_update
+  }
   invert_time.stop();
 Kokkos::finalize();
 
