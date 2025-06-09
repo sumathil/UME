@@ -77,6 +77,13 @@ Where there is expected to be a set of files named as if generated
 with `sprintf(filename, '%s.%05d.ume', prefix, rank)` for 0 <= rank <
 n. 
 
+### Run gradient kernel multiple times
+
+By default, the gradient kernel is run once. There is an option to run gradient kernel in `ume_mpi` multiple times to increase the computations for benchmarking purposes using command line argument. 
+
+```shell
+ % mpirun -np <n> ume_mpi <prefix> -i <number of iterations>
+ ```
 
 ## Project Name
 
