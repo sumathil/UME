@@ -54,7 +54,6 @@ add_library(Ume
   #gradient-point+zone-cuda.cc
   #gradient.cc
   face_area.cc
-  gradient.cc
   utils.cc
   )
 

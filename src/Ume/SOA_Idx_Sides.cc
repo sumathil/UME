@@ -257,8 +257,27 @@ bool Sides::VAR_side_vol::init_() const {
   auto const &smask{sides().mask};
   auto &side_vol = mydata_dblv();
   side_vol.assign(sll, 0.0);
-
-  for (int s = 0; s < sl; ++s) {
+ 
+  /*for (int s = 0; s < sl; ++s) {
+    if (smask[s] > 0) {
+      Vec3 const &zc = zx[s2z[s]];
+      Vec3 const &p1 = px[s2p1[s]];
+      Vec3 const &p2 = px[s2p2[s]];
+      Vec3 const &fc = fx[s2f[s]];
+      /* Note that this is a signed volume of the tetrahedron formed by the zone
+         center, face center, and edge endpoints. */
+     /* auto const fz = fc - zc;
+      auto const p1z = p1 - zc;
+      auto const p2z = p2 - zc;
+      auto const cp = crossprod(p2z, p1z);
+      side_vol[s] = dotprod(fz, cp) / 6.0;
+    } else
+      side_vol[s] = 0.0;
+  }*/
+  
+  Kokkos::View<double *, Kokkos::HostSpace>  local_side_vol_k(&side_vol[0], sl);
+  
+  Kokkos::parallel_for("VAR_side_vol", sl, KOKKOS_LAMBDA (const int s) {
     if (smask[s] > 0) {
       Vec3 const &zc = zx[s2z[s]];
       Vec3 const &p1 = px[s2p1[s]];
@@ -270,11 +289,11 @@ bool Sides::VAR_side_vol::init_() const {
       auto const p1z = p1 - zc;
       auto const p2z = p2 - zc;
       auto const cp = crossprod(p2z, p1z);
-
-      side_vol[s] = dotprod(fz, cp) / 6.0;
+      local_side_vol_k[s] = dotprod(fz, cp) / 6.0;
     } else
-      side_vol[s] = 0.0;
-  }
+      local_side_vol_k[s] = 0.0;
+  });
+
   sides().scatter(side_vol);
   VAR_INIT_EPILOGUE;
 }

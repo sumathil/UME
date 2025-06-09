@@ -19,7 +19,7 @@
 #endif
 
 #include "Ume/face_area.hh"
-
+#include <Kokkos_Core.hpp>
 namespace Ume {
 
 using Mesh = SOA_Idx::Mesh;
@@ -44,7 +44,9 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area, int cali_record) {
   if(cali_record)
     CALI_MARK_BEGIN("Calc_Face_Area_Loop");
 #endif
-  for (int s = 0; s < sl; ++s) {
+
+
+  /*for (int s = 0; s < sl; ++s) {
     if (side_type[s] < 1)
       continue; // We want internal sides only
     if (side_tag[s] == 1)
@@ -58,7 +60,42 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area, int cali_record) {
       int const s2 = s_to_s2_map[s];
       side_tag[s2] = 1;
     }
-  }
+  }*/
+
+  /*for (int s = 0; s < sl; ++s) {
+    if (side_type[s] >= 1 || side_tag[s] != 1)
+    {
+     int const f = s_to_f_map[s];
+      if (face_comm_type[f] < 3) { // Internal or master face
+      double const side_area = vectormag(surz[s]); // Flat area
+      face_area[f] += side_area;
+
+      int const s2 = s_to_s2_map[s];
+      side_tag[s2] = 1;
+    }
+    }
+ 
+  }*/
+
+
+Kokkos::View<double *, Kokkos::HostSpace>  local_face_area(&face_area[0], face_area.size());
+Kokkos::View<int *, Kokkos::HostSpace>  local_side_tag(&side_tag[0], side_tag.size());
+
+Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
+    if (side_type[s] >= 1 && local_side_tag[s] != 1)
+    {
+    int const f = s_to_f_map[s];
+    if (face_comm_type[f] < 3) { // Internal or master face
+      double const side_area = vectormag(surz[s]); // Flat area
+      local_face_area[f] += side_area;
+
+      int const s2 = s_to_s2_map[s];
+      local_side_tag[s2] = 1;
+    }
+    }
+});
+
+  
 #ifdef USE_CALI
   if(cali_record)
     CALI_MARK_END("Calc_Face_Area_Loop");

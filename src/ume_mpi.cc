@@ -83,7 +83,7 @@ using VEC3_T = typename Ume::DS_Types::VEC3_T;
 int main(int argc, char *argv[]) {
 
   Ume::SOA_Idx::Mesh mesh;
-
+  Kokkos::initialize(argc, argv);
   
   /* We need to instantiated the MPI Transport in order to get the PE number
      used to form our filename, */
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
   if (comm.pe() == 0)
     std::cout << "Calculating gradient..." << std::endl;
 
-Kokkos::initialize(argc, argv); 
+ 
   VEC3V_T pgrad, zgrad;
   Ume::Timer orig_time;
   Ume::gradzatz(mesh, zfield, zgrad, pgrad, 0);
@@ -155,7 +155,7 @@ Kokkos::initialize(argc, argv);
   Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert, 1);
   }
   invert_time.stop();
-Kokkos::finalize();
+
 
   // Double check that the gradients are non-zero where we expect
   if (comm.pe() == 0) {
@@ -233,6 +233,7 @@ Kokkos::finalize();
   if (comm.pe() == 0)
     std::cout << "Done." << std::endl;
   comm.stop();
+  Kokkos::finalize();
   return 0;
 }
 
