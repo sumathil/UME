@@ -62,21 +62,6 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area, int cali_record) {
     }
   }*/
 
-  /*for (int s = 0; s < sl; ++s) {
-    if (side_type[s] >= 1 || side_tag[s] != 1)
-    {
-     int const f = s_to_f_map[s];
-      if (face_comm_type[f] < 3) { // Internal or master face
-      double const side_area = vectormag(surz[s]); // Flat area
-      face_area[f] += side_area;
-
-      int const s2 = s_to_s2_map[s];
-      side_tag[s2] = 1;
-    }
-    }
- 
-  }*/
-
 
 Kokkos::View<double *, Kokkos::HostSpace>  local_face_area(&face_area[0], face_area.size());
 Kokkos::View<int *, Kokkos::HostSpace>  local_side_tag(&side_tag[0], side_tag.size());
