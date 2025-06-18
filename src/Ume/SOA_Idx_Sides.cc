@@ -156,7 +156,19 @@ bool Sides::VAR_side_surf::init_() const {
   
 Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_side_surf(&side_surf[0], sl);
 
-  /*
+Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_ex(&ex[0], sl);
+Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_fx(&fx[0], sl);
+Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_px(&px[0], sl);
+Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_zx(&zx[0], sl);
+
+Kokkos::View<const int *, Kokkos::HostSpace>  local_s2p1(&s2p1[0], sl);
+Kokkos::View<const int *, Kokkos::HostSpace>  local_s2p2(&s2p2[0], sl);
+Kokkos::View<const int *, Kokkos::HostSpace>  local_s2e(&s2e[0], sl);
+Kokkos::View<const int *, Kokkos::HostSpace>  local_s2f(&s2f[0], sl); 
+Kokkos::View<const int *, Kokkos::HostSpace>  local_s2z(&s2z[0], sl);  
+
+
+/*
    * Naive kokkos parallel_for
    */
   Kokkos::parallel_for("VAR_side_surf", sl, KOKKOS_LAMBDA (const int s) {
@@ -221,7 +233,15 @@ bool Sides::VAR_side_surz::init_() const {
   }*/
   
   Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_side_surz_k(&side_surz[0], sl);
+  
 
+  Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_fx(&fx[0], sl);
+  Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_px(&px[0], sl);
+
+  Kokkos::View<const int *, Kokkos::HostSpace>  local_s2p1(&s2p1[0], sl);
+  Kokkos::View<const int *, Kokkos::HostSpace>  local_s2p2(&s2p2[0], sl);
+  Kokkos::View<const int *, Kokkos::HostSpace>  local_s2f(&s2f[0], sl); 
+  
   /*
    * Naive kokkos parallel_for
    */
@@ -234,7 +254,7 @@ bool Sides::VAR_side_surz::init_() const {
       // Area-weighted normal of triangle <p2, p1, fc>
       local_side_surz_k[s] = crossprod(p2 - fc, p1 - fc) / 2.0;
     } else{
-      local_side_surz_k[s] =0.0;
+      local_side_surz_k[s] = 0.0;
     }
    });
 

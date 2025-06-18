@@ -224,7 +224,9 @@ int main(int argc, char *argv[]) {
   
   orig_time.clear();
   orig_time.start();
+  for (size_t i=0;i<ic;i++){
   Ume::calc_face_area(mesh, face_area, 1);
+  }
   orig_time.stop();
 
   if (comm.pe() == 0)
