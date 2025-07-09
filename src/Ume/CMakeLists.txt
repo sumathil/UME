@@ -49,10 +49,10 @@ add_library(Ume
   SOA_Idx_Points.cc
   SOA_Idx_Sides.cc
   SOA_Idx_Zones.cc
-  gradient-allkokkos_cpu.cc
-  #gradient-ivtp-cuda.cc
+  #gradient-allkokkos_cpu.cc
+ # gradient-ivtp-cuda.cc
   #gradient-point+zone-cuda.cc
-  #gradient.cc
+  gradient_all_gpu.cc
   face_area.cc
   utils.cc
   )
