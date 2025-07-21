@@ -154,7 +154,7 @@ bool Sides::VAR_side_surf::init_() const {
 
   
   
-Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_side_surf(&side_surf[0], sl);
+/*Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_side_surf(&side_surf[0], sl);
 
 Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_ex(&ex[0], sl);
 Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_fx(&fx[0], sl);
@@ -166,12 +166,12 @@ Kokkos::View<const int *, Kokkos::HostSpace>  local_s2p2(&s2p2[0], sl);
 Kokkos::View<const int *, Kokkos::HostSpace>  local_s2e(&s2e[0], sl);
 Kokkos::View<const int *, Kokkos::HostSpace>  local_s2f(&s2f[0], sl); 
 Kokkos::View<const int *, Kokkos::HostSpace>  local_s2z(&s2z[0], sl);  
+*/
 
-
-/*
+   /*
    * Naive kokkos parallel_for
    */
-  Kokkos::parallel_for("VAR_side_surf", sl, KOKKOS_LAMBDA (const int s) {
+ /* Kokkos::parallel_for("VAR_side_surf", sl, KOKKOS_LAMBDA (const int s) {
       if (smask[s] > 0) {
       // A real side in the interior of the mesh
       Vec3 const &zc = zx[s2z[s]];
@@ -183,7 +183,7 @@ Kokkos::View<const int *, Kokkos::HostSpace>  local_s2z(&s2z[0], sl);
       local_side_surf[s] = crossprod(ep - zc, fp - zc) / 2.0;
     } else if (smask[s] < 0) {
       /* A ghost side on a mesh boundary face.  There isn't really a zx here, so
-         we compute it differently */
+         we compute it differently 
       Vec3 const &fc = fx[s2f[s]];
       Vec3 const &p1 = px[s2p1[s]];
       Vec3 const &p2 = px[s2p2[s]];
@@ -191,7 +191,7 @@ Kokkos::View<const int *, Kokkos::HostSpace>  local_s2z(&s2z[0], sl);
     } else
       local_side_surf[s] = 0.0;
 
-   });
+   });*/
 
   sides().scatter(side_surf);
   VAR_INIT_EPILOGUE;
@@ -216,7 +216,7 @@ bool Sides::VAR_side_surz::init_() const {
  
   /*
    * This for loop is converted to kokkos parallel_for
-   *
+   */
   for (int s = 0; s < sl; ++s) {
     if (smask[s]) {
       // A non-ghost side
@@ -224,15 +224,14 @@ bool Sides::VAR_side_surz::init_() const {
       Vec3 const &p1 = px[s2p1[s]]; // 2
       Vec3 const &p2 = px[s2p2[s]]; // 1
       // Area-weighted normal of triangle <p2, p1, fc>
-      local_side_surz[s] = crossprod(p2 - fc, p1 - fc) / 2.0;
+      side_surz[s] = crossprod(p2 - fc, p1 - fc) / 2.0;
     } else
     {
-      local_side_surz[s] = 0.0;
+      side_surz[s] = 0.0;
     }
-    side_surz[s]=local_side_surz[s];
-  }*/
+  }
   
-  Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_side_surz_k(&side_surz[0], sl);
+  /*Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_side_surz_k(&side_surz[0], sl);
   
 
   Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_fx(&fx[0], sl);
@@ -242,9 +241,7 @@ bool Sides::VAR_side_surz::init_() const {
   Kokkos::View<const int *, Kokkos::HostSpace>  local_s2p2(&s2p2[0], sl);
   Kokkos::View<const int *, Kokkos::HostSpace>  local_s2f(&s2f[0], sl); 
   
-  /*
-   * Naive kokkos parallel_for
-   */
+
   Kokkos::parallel_for("VAR_side_surz", sl, KOKKOS_LAMBDA (const int s) {
       if (smask[s]) {
       // A non-ghost side
@@ -256,7 +253,7 @@ bool Sides::VAR_side_surz::init_() const {
     } else{
       local_side_surz_k[s] = 0.0;
     }
-   });
+   });*/
 
 
   sides().scatter(side_surz);
@@ -278,26 +275,7 @@ bool Sides::VAR_side_vol::init_() const {
   auto &side_vol = mydata_dblv();
   side_vol.assign(sll, 0.0);
  
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s] > 0) {
-      Vec3 const &zc = zx[s2z[s]];
-      Vec3 const &p1 = px[s2p1[s]];
-      Vec3 const &p2 = px[s2p2[s]];
-      Vec3 const &fc = fx[s2f[s]];
-      /* Note that this is a signed volume of the tetrahedron formed by the zone
-         center, face center, and edge endpoints. */
-     /* auto const fz = fc - zc;
-      auto const p1z = p1 - zc;
-      auto const p2z = p2 - zc;
-      auto const cp = crossprod(p2z, p1z);
-      side_vol[s] = dotprod(fz, cp) / 6.0;
-    } else
-      side_vol[s] = 0.0;
-  }*/
-  
-  Kokkos::View<double *, Kokkos::HostSpace>  local_side_vol_k(&side_vol[0], sl);
-  
-  Kokkos::parallel_for("VAR_side_vol", sl, KOKKOS_LAMBDA (const int s) {
+  for (int s = 0; s < sl; ++s) {
     if (smask[s] > 0) {
       Vec3 const &zc = zx[s2z[s]];
       Vec3 const &p1 = px[s2p1[s]];
@@ -309,10 +287,29 @@ bool Sides::VAR_side_vol::init_() const {
       auto const p1z = p1 - zc;
       auto const p2z = p2 - zc;
       auto const cp = crossprod(p2z, p1z);
+      side_vol[s] = dotprod(fz, cp) / 6.0;
+    } else
+      side_vol[s] = 0.0;
+  }
+  
+  //Kokkos::View<double *, Kokkos::HostSpace>  local_side_vol_k(&side_vol[0], sl);
+  
+  /*Kokkos::parallel_for("VAR_side_vol", sl, KOKKOS_LAMBDA (const int s) {
+    if (smask[s] > 0) {
+      Vec3 const &zc = zx[s2z[s]];
+      Vec3 const &p1 = px[s2p1[s]];
+      Vec3 const &p2 = px[s2p2[s]];
+      Vec3 const &fc = fx[s2f[s]];
+      /* Note that this is a signed volume of the tetrahedron formed by the zone
+         center, face center, and edge endpoints. 
+      auto const fz = fc - zc;
+      auto const p1z = p1 - zc;
+      auto const p2z = p2 - zc;
+      auto const cp = crossprod(p2z, p1z);
       local_side_vol_k[s] = dotprod(fz, cp) / 6.0;
     } else
       local_side_vol_k[s] = 0.0;
-  });
+  });*/
 
   sides().scatter(side_vol);
   VAR_INIT_EPILOGUE;

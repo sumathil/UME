@@ -96,7 +96,7 @@ bool Points::VAR_point_norm::init_() const {
 
   point_norm.resize(pll, Vec3(0.0));
   
-  Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_point_norm_k(&point_norm[0], sl);
+  /*Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_point_norm_k(&point_norm[0], sl);
   //Kokkos::Experimental::ScatterView<Vec3*> scatter_point_norm(local_point_norm_k);
   
   Kokkos::parallel_for("Var_point_norm", sl , KOKKOS_LAMBDA (const int s) {
@@ -107,10 +107,10 @@ bool Points::VAR_point_norm::init_() const {
       local_point_norm_k[p1] += side_surz[s2];
       local_point_norm_k[p2] += side_surz[s2];
     }
-  });
+  });*/
  
 
-  /*for (int s = 0; s < sl; ++s) {
+  for (int s = 0; s < sl; ++s) {
     if (smask[s] == -1) { // boundary side (outside of real mesh)
       int const s2 = s2s2[s]; // the corresponding real side
       int const p1 = s2p1[s2];
@@ -118,22 +118,22 @@ bool Points::VAR_point_norm::init_() const {
       point_norm[p1] += side_surz[s2];
       point_norm[p2] += side_surz[s2];
     }
-  }*/
+  }
 
   /* Since points are shared among adjacent parallel ranks, we need to do a
      parallel sum. */
   points().gathscat(Comm::Op::SUM, point_norm);
- /* for (int p = 0; p < pl; ++p) {
+  for (int p = 0; p < pl; ++p) {
     if (pmask[p] < 0) {
          normalize(point_norm[p]);
     }
-  }*/
+  }
 
-  Kokkos::parallel_for("normalize_point_norm", pl , KOKKOS_LAMBDA (const int p) {
+  /*Kokkos::parallel_for("normalize_point_norm", pl , KOKKOS_LAMBDA (const int p) {
     if (pmask[p] < 0) {
          normalize(local_point_norm_k[p]);
     }
-  });
+  });*/
 
   VAR_INIT_EPILOGUE;
 }
