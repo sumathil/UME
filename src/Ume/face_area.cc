@@ -27,7 +27,7 @@ using DBLV_T = DS_Types::DBLV_T;
 using INTV_T = DS_Types::INTV_T;
 using VEC3V_T = DS_Types::VEC3V_T;
 
-void calc_face_area(Mesh &mesh, DBLV_T &face_area, int cali_record) {
+void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
   auto const &side_type = mesh.sides.mask;
   auto const &face_comm_type = mesh.faces.comm_type;
   auto const &s_to_f_map = mesh.ds->caccess_intv("m:s>f");
@@ -39,11 +39,6 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area, int cali_record) {
 
   std::fill(face_area.begin(), face_area.end(), 0.0);
   INTV_T side_tag(sll, 0);
-
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Calc_Face_Area_Loop");
-#endif
 
  /* for (int s = 0; s < sl; ++s) {
     if (side_type[s] < 1)
@@ -59,7 +54,7 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area, int cali_record) {
       int const s2 = s_to_s2_map[s];
       side_tag[s2] = 1;
     }
-  }*/
+  }
 
 
 Kokkos::View<double *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_face_area(&face_area[0], face_area.size());
@@ -96,12 +91,29 @@ Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
     }
 });
 Kokkos::fence();
-Kokkos::deep_copy(h_face_area, d_face_area);
-  
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Calc_Face_Area_Loop");
-#endif
+Kokkos::deep_copy(h_face_area, d_face_area);*/
+
+Kokkos::View<double *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_face_area(&face_area[0], face_area.size());
+Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
+Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
+Kokkos::View<const Vec3 *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_surz(&surz[0], surz.size());
+Kokkos::View<int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_side_tag(&side_tag[0], side_tag.size());
+
+
+Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
+    if (side_type[s] >= 1 && side_tag[s] != 1)
+    {
+    int const f = local_s_to_f_map[s];
+    if (face_comm_type[f] < 3) { // Internal or master face
+      double const side_area = vectormag(local_surz[s]); // Flat area
+      local_face_area[f] += side_area;
+
+      int const s2 = local_s_to_s2_map[s];
+      local_side_tag[s2] = 1;
+    }
+    }
+});
+
   mesh.faces.scatter(face_area);
 }
 

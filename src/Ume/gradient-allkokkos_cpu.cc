@@ -32,7 +32,7 @@ using VEC3V_T = DS_Types::VEC3V_T;
 using VEC3_T = DS_Types::VEC3_T;
 
 void gradzatp(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &point_gradient, int cali_record) {
+    VEC3V_T &point_gradient) {
   auto const &csurf = mesh.ds->caccess_vec3v("corner_csurf");
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
   auto const &point_normal = mesh.ds->caccess_vec3v("point_norm");
@@ -62,10 +62,7 @@ Kokkos::View<const Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>
 Kokkos::View<const double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_zone_field(&zone_field[0], zone_field.size());
 Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_point_type(&point_type[0], point_type.size());
 Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_corner_type(&corner_type[0], corner_type.size());
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Gradzatp_Point_Volume_Loop");
-#endif
+
   Kokkos::parallel_for("gradzatp-1", cl, KOKKOS_LAMBDA (const int c) {
     if (k_corner_type[c] >= 1) {  
       int const z = k_c_to_z_map[c];
@@ -75,10 +72,7 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
     }
   });
 
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Gradzatp_Point_Volume_Loop");
-#endif 
+
   mesh.points.gathscat(Ume::Comm::Op::SUM, point_volume);
   mesh.points.gathscat(Ume::Comm::Op::SUM, point_gradient);
 
@@ -88,10 +82,6 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
     of the gradient using the point normals.
    */
 
-  #ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Gradzatp_Point_Gradient_Loop");
-#endif 
 
   Kokkos::parallel_for("gradzatp-2", pl, KOKKOS_LAMBDA (const int p) {
     if (k_point_type[p] > 0) {
@@ -103,10 +93,7 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
       k_point_gradient[p] = (k_point_gradient[p] - k_point_normal[p] * ppdot) / k_point_volume[p];
     }
   });
-  #ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Gradzatp_Point_Gradient_Loop");
-#endif  
+ 
 zatp_time.stop();
 std::cout << "zatp_time: " << zatp_time.seconds() << "s\n";
 
@@ -114,7 +101,7 @@ std::cout << "zatp_time: " << zatp_time.seconds() << "s\n";
 }
 
 void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &zone_gradient, VEC3V_T &point_gradient, int cali_record) {
+    VEC3V_T &zone_gradient, VEC3V_T &point_gradient) {
   auto const &c_to_z_map = mesh.ds->caccess_intv("m:c>z");
   auto const &c_to_p_map = mesh.ds->caccess_intv("m:c>p");
   int const num_local_corners = mesh.corners.local_size();
@@ -122,7 +109,7 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
 
   // Get the field gradient at each mesh point.
-  gradzatp(mesh, zone_field, point_gradient, cali_record);
+  gradzatp(mesh, zone_field, point_gradient);
   /* Accumulate the zone volume.  Note that we need to allocate a zone field for
      volume, as we are accumulating from corners */
   DBLV_T zone_volume(mesh.zones.size(), 0.0);
@@ -138,10 +125,7 @@ Kokkos::View<double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>>  k_zo
 Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_point_gradient(&point_gradient[0], point_gradient.size());
 Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_corner_type(&corner_type[0], corner_type.size());
 
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Gradzatp_Zone_Volume_Loop");
-#endif 
+
 // scatterview
   Kokkos::parallel_for("gradzatp-ivt", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
     if (k_corner_type[corner_idx] >= 1){
@@ -152,18 +136,10 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
     }
   });
 
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Gradzatp_Zone_Volume_Loop");
-#endif  
 
   // Accumulate the zone-centered gradient
   zone_gradient.assign(mesh.zones.size(), VEC3_T(0.0));
 
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Gradzatp_Zone_Gradient_Loop");
-#endif
 // scatterview  
   Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>> k_zone_gradient(&zone_gradient[0], zone_gradient.size());
   Kokkos::parallel_for("gradzatp-ivt", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
@@ -175,10 +151,7 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
       k_zone_gradient[zone_idx] += k_point_gradient[point_idx] * c_z_vol_ratio;
      }
     });
- #ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Gradzatp_Zone_Gradient_Loop");
-#endif     
+   
 zatz_time.stop();
 std::cout << "zatz_time: " << zatz_time.seconds() << "s\n";
 
@@ -186,7 +159,7 @@ std::cout << "zatz_time: " << zatz_time.seconds() << "s\n";
 }
 
 void gradzatp_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &point_gradient,int cali_record ) {
+    VEC3V_T &point_gradient) {
   auto const &csurf = mesh.ds->caccess_vec3v("corner_csurf");
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
   auto const &point_normal = mesh.ds->caccess_vec3v("point_norm");
@@ -213,10 +186,6 @@ Kokkos::View<const double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanage
 Kokkos::View<const Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_point_normal(&point_normal[0], point_normal.size());
 Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_point_type(&point_type[0], point_type.size());
 
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Gradzatp_Invert_Point_Volume_Loop");
-#endif 
 
   Kokkos::parallel_for("gradzatp-ivt", num_local_points, KOKKOS_LAMBDA (const int point_idx) {
     for (int const &corner_idx : p_to_c_map[point_idx]) {
@@ -225,16 +194,7 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
       k_point_gradient[point_idx] += k_csurf[corner_idx] * k_zone_field[zone_idx];
     }
   });
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Gradzatp_Invert_Point_Volume_Loop");
-#endif  
 
-// check for gathscat in gradient.cc
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Gradzatp_Invert_Point_Gradient_Loop");
-#endif  
    Kokkos::parallel_for("gradzatp-ivt-2", num_local_points, KOKKOS_LAMBDA (const int point_idx) {
     if (k_point_type[point_idx] > 0) {
       // Internal point
@@ -247,10 +207,7 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
           k_point_volume[point_idx];
     }
   });
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Gradzatp_Invert_Point_Gradient_Loop");
-#endif  
+
 zatpivt_time.stop();
 std::cout << "zatpivt_time: " << zatpivt_time.seconds() << "s\n";
  
@@ -258,7 +215,7 @@ std::cout << "zatpivt_time: " << zatpivt_time.seconds() << "s\n";
 }
 
 void gradzatz_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &zone_gradient, VEC3V_T &point_gradient, int cali_record) {
+    VEC3V_T &zone_gradient, VEC3V_T &point_gradient) {
   auto const &z_to_c_map = mesh.ds->caccess_intrr("m:z>c");
   auto const &c_to_p_map = mesh.ds->caccess_intv("m:c>p");
   int const num_local_zones = mesh.zones.local_size();
@@ -266,7 +223,7 @@ void gradzatz_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
 
   // Get the field gradient at each mesh point.
-  gradzatp_invert(mesh, zone_field, point_gradient, cali_record);
+  gradzatp_invert(mesh, zone_field, point_gradient);
   zone_gradient.assign(mesh.zones.size(), VEC3_T(0.0));
 
 Ume::Timer zatzivt_time;
@@ -278,12 +235,7 @@ Kokkos::View<const int *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged> 
 Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>> k_zone_gradient(&zone_gradient[0], zone_gradient.size());
 Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_point_gradient(&point_gradient[0], point_gradient.size());
 
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_BEGIN("Gradzatz_Invert_Zone_Gradient_Loop");
-#endif  
-
-  Kokkos::parallel_for("gradzatz-ivt-1", num_local_zones, KOKKOS_LAMBDA (const int zone_idx) {
+Kokkos::parallel_for("gradzatz-ivt-1", num_local_zones, KOKKOS_LAMBDA (const int zone_idx) {
     if (k_zone_type[zone_idx] >= 1){
       // Only operate on local interior zones
 
@@ -300,10 +252,7 @@ Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_po
       }
     }
   });
-#ifdef USE_CALI
-  if(cali_record)
-    CALI_MARK_END("Gradzatz_Invert_Zone_Gradient_Loop");
-#endif  
+
 zatzivt_time.stop();
 std::cout << "zatzivt_time: " << zatzivt_time.seconds() << "s\n";
 
