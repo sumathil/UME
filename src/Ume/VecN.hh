@@ -193,10 +193,23 @@ void normalize(Vec3 &a) {
   a /= std::sqrt(mag);
 }
 
+KOKKOS_INLINE_FUNCTION
 constexpr double vectormag(Vec3 const &a) {
   double const mag = std::sqrt(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
   return mag;
 }
 
 } // namespace Ume
+/*namespace Kokkos {
+
+  template <>
+  struct reduction_identity<Ume::Vec3> {
+    KOKKOS_FORCEINLINE_FUNCTION
+    static constexpr Ume::Vec3 sum() {
+      Ume::Vec3 zero;
+      for (int i=0;i<3;++i) zero.data_[i]=0.0;
+      return zero;
+    }
+  };
+}*/
 #endif

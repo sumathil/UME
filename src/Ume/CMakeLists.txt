@@ -26,10 +26,12 @@ set(UME_INCLUDE_FILES
   SOA_Idx_Points.hh
   SOA_Idx_Sides.hh
   SOA_Idx_Zones.hh
+  SOA_Idx_Iotas.hh
   Timer.hh
   VecN.hh
   face_area.hh
   gradient.hh
+  renumbering.hh
   soa_idx_helpers.hh
   utils.hh
   )
@@ -49,8 +51,14 @@ add_library(Ume
   SOA_Idx_Points.cc
   SOA_Idx_Sides.cc
   SOA_Idx_Zones.cc
+  SOA_Idx_Iotas.cc
+  #gradient-allkokkos_cpu.cc
+ # gradient-ivtp-cuda.cc
+  #gradient-point+zone-cuda.cc
+  gradient_all_gpu.cc
   face_area.cc
   gradient.cc
+  renumbering.cc
   utils.cc
   )
 

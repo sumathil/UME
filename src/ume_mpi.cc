@@ -27,6 +27,7 @@
 #include "Ume/Timer.hh"
 #include "Ume/face_area.hh"
 #include "Ume/gradient.hh"
+#include "Ume/renumbering.hh"
 #include "Ume/utils.hh"
 #include <cassert>
 #include <cstdio>
@@ -35,67 +36,46 @@
 #include <map>
 #include <vector>
 
-void process_mem_usage(double& vm_usage, double& resident_set)
-{
-   using std::ios_base;
-   using std::ifstream;
-   using std::string;
-
-   vm_usage     = 0.0;
-   resident_set = 0.0;
-
-   // 'file' stat seems to give the most reliable results
-   //
-   ifstream stat_stream("/proc/self/stat",ios_base::in);
-
-   // dummy vars for leading entries in stat that we don't care about
-   //
-   string pid, comm, state, ppid, pgrp, session, tty_nr;
-   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-   string utime, stime, cutime, cstime, priority, nice;
-   string O, itrealvalue, starttime;
-
-   // the two fields we want
-   //
-   unsigned long vsize;
-   long rss;
-
-   stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-               >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-               >> utime >> stime >> cutime >> cstime >> priority >> nice
-               >> O >> itrealvalue >> starttime >> vsize >> rss; // don't care about the rest
-
-   stat_stream.close();
-
-   long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
-   vm_usage     = vsize / 1024.0;
-   resident_set = rss * page_size_kb;
-}
-
-bool read_mesh(
-    char const *const basename, int const mype, Ume::SOA_Idx::Mesh &mesh);
-bool test_point_gathscat(Ume::SOA_Idx::Mesh &mesh);
-
+using Mesh = Ume::SOA_Idx::Mesh;
 using DBLV_T = typename Ume::DS_Types::DBLV_T;
 using VEC3V_T = typename Ume::DS_Types::VEC3V_T;
 using VEC3_T = typename Ume::DS_Types::VEC3_T;
 
+bool read_mesh(char const *const basename, int const mype, Mesh &mesh);
+bool test_point_gathscat(Mesh &mesh);
+void check_gradzatz_diffs(Mesh const &mesh, int const &centered_zone_index,
+                         VEC3V_T const &zgrad, VEC3V_T const &zgrad_invert,
+                         VEC3V_T const &pgrad, VEC3V_T const &pgrad_invert);
+
 int main(int argc, char *argv[]) {
+  /* We will read in the mesh */
+  Mesh mesh;
 
   Ume::SOA_Idx::Mesh mesh;
-
+  Kokkos::initialize(argc, argv);
+  
   /* We need to instantiated the MPI Transport in order to get the PE number
      used to form our filename, */
   Ume::Comm::MPI comm(&argc, &argv);
-  mesh.comm = &comm; // Attach the communicator to the mesh
+  mesh.comm = &comm;
 
   if (comm.pe() == 0)
     std::cout << "Initializing mesh..." << std::endl;
+
   /* Read the data file */
   if (!read_mesh(argv[1], comm.pe(), mesh)) {
     std::cerr << "Aborting." << std::endl;
-    return 1;
+    return EXIT_FAILURE;
   }
+  size_t ic = 1; // set iteration count to 1 for default 
+  if(argc > 3 && std::string(argv[2])=="-i"){
+     ic=std::atoi(argv[3]);
+  } 
+
+  size_t ic = 1; // set iteration count to 1 for default 
+  if(argc > 3 && std::string(argv[2])=="-i") {
+     ic=std::atoi(argv[3]);
+  } 
 
   /* This allows us to attach a debugger to a single rank specified in the
      UME_DEBUG_RANK environment variable. */
@@ -111,27 +91,38 @@ int main(int argc, char *argv[]) {
 
   if (comm.pe() == 0)
     std::cout << "Creating zone field..." << std::endl;
-  auto const &kztyp = mesh.zones.mask;
 
-  // Find a local zone to set a value in
+  /* Find an interior local zone to set a value in. NOTE zone types
+   * -1: exterior zone
+   *  0: null zone or parallel ghost zone (halo)
+   *  1: interior zone */
   int czi = mesh.zones.local_size() / 2;
+  auto const &kztyp = mesh.zones.mask;
   while (czi < mesh.zones.local_size() && kztyp[czi] < 1)
     czi += 1;
   assert(czi < mesh.zones.local_size());
 
-  // Create a zone-field that is zero everywhere but in czi.
+  /* Create a zone-field that is everywhere zero but in the centered
+   * zone at index czi. */
   DBLV_T zfield(mesh.zones.size(), 0.0);
   zfield[czi] = 100000.0;
-
+   
+  
   // Do a zone-centered gradient calculation on that field (in parallel)
   if (comm.pe() == 0)
-    std::cout << "Calculating gradient..." << std::endl;
+    std::cout << "Computing zone-centered gradient..." << std::endl;
 
+  /* Do a parallel zone-centered gradient computation on that field.
+   * Here we run the computation once to initialize mesh structures
+   * and time only the second run. We then run the same computations
+   * using inverted connectivities. */
   VEC3V_T pgrad, zgrad;
   Ume::Timer orig_time;
   Ume::gradzatz(mesh, zfield, zgrad, pgrad, 0);
   orig_time.start();
+  for (size_t i=0;i<ic;i++){
   Ume::gradzatz(mesh, zfield, zgrad, pgrad, 1);
+  }
   orig_time.stop();
 
   double vm, rss;
@@ -142,8 +133,11 @@ int main(int argc, char *argv[]) {
   Ume::Timer invert_time;
   Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert, 0);
   invert_time.start();
+  for (size_t i=0;i<ic;i++){
   Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert, 1);
+  }
   invert_time.stop();
+
 
   // Double check that the gradients are non-zero where we expect
   if (comm.pe() == 0) {
@@ -152,15 +146,46 @@ int main(int argc, char *argv[]) {
     std::cout << "Checking gradient result..." << std::endl;
   }
 
-  if (zgrad != zgrad_invert) {
-    std::cout << "PE" << mesh.mype << " zgrad != zgrad_invert" << std::endl;
-    if (mesh.mype == 0) {
-      for (int z = 0; z < mesh.zones.size(); ++z) {
-        if (zgrad[z] != zgrad_invert[z]) {
-          std::cout << "Z" << z << " " << mesh.zones.mask[z] << ": " << zgrad[z]
-                    << " vs. " << zgrad_invert[z] << "\n";
-        }
+  /* Double check that the gradients are non-zero where we expect */
+  check_gradzatz_diffs(mesh, czi, zgrad, zgrad_invert, pgrad, pgrad_invert);
+
+  if (comm.pe() == 0)
+    std::cout << "Computing face areas..." << std::endl;
+
+  /* Do a face area computation on the mesh making use of the MPI comm
+   * stencil. First create a result vector and initialize to an
+   * impossible value. */
+  DBLV_T face_area(mesh.faces.size(), -100000.0);
+  Ume::Timer face_time;
+  Ume::calc_face_area(mesh, face_area);
+  face_time.start();
+  for (size_t i=0;i<ic;i++) {
+    Ume::calc_face_area(mesh, face_area);
+  }
+  face_time.stop();
+
+  if (comm.pe() == 0)
+    std::cout << "Face area computation took: " << face_time.seconds() << "s\n";
+
+  if (mesh.ivtag >= UME_VERSION_2) {
+    if (comm.pe() == 0)
+      std::cout << "Renumbering mesh entities..." << std::endl;
+
+    if (mesh.dump_iotas) {
+      Ume::Timer renumber_time;
+      Ume::renumber_mesh(mesh);
+      renumber_time.start();
+      for (size_t i=0;i<ic;i++) {
+        Ume::renumber_mesh(mesh);
       }
+      renumber_time.stop();
+
+      if (comm.pe() == 0)
+        std::cout << "Renumbering algorithm took: " << renumber_time.seconds() << "s\n";
+    } else {
+      if (comm.pe() == 0)
+        std::cout << "Iotas must be present in the mesh for renumbering."
+          << " Skipping renumbering..." << std::endl;
     }
   }
 
@@ -212,7 +237,9 @@ int main(int argc, char *argv[]) {
   
   orig_time.clear();
   orig_time.start();
+  for (size_t i=0;i<ic;i++){
   Ume::calc_face_area(mesh, face_area, 1);
+  }
   orig_time.stop();
 
   if (comm.pe() == 0)
@@ -220,12 +247,13 @@ int main(int argc, char *argv[]) {
 
   if (comm.pe() == 0)
     std::cout << "Done." << std::endl;
+
   comm.stop();
+  Kokkos::finalize();
   return 0;
 }
 
-bool read_mesh(
-    char const *const basename, int const mype, Ume::SOA_Idx::Mesh &mesh) {
+bool read_mesh(char const *const basename, int const mype, Mesh &mesh) {
   char fname[80];
   sprintf(fname, "%s.%05d.ume", basename, mype);
   std::ifstream is(fname);
@@ -236,18 +264,18 @@ bool read_mesh(
   }
   mesh.read(is);
   is.close();
+  mesh.print_stats(std::cout);
   return true;
 }
 
-bool test_point_gathscat(Ume::SOA_Idx::Mesh &mesh) {
+bool test_point_gathscat(Mesh &mesh) {
   int const mype = mesh.comm->id();
 
   /* Initialize an integer field to the value 10 everywhere except:
-       a copy = -1
-       a source = the number of copies of this entity
-     A sum will set the source to zero, which should then get scattered
-     out to the copies.
-  */
+   *   a copy = -1
+   *   a source = the number of copies of this entity
+   * A sum will set the source to zero, which should then get scattered
+   * out to the copies. */
   int const background_val = 100;
   typename Ume::DS_Types::INTV_T int_field(mesh.points.size(), background_val);
 
@@ -258,8 +286,9 @@ bool test_point_gathscat(Ume::SOA_Idx::Mesh &mesh) {
     }
   }
 
-  /* We're "pre-summing" the source counts so that we can check that the source
-     values in the int_field are set to the background value. */
+  /* We're "pre-summing" the source counts so that we can check that
+   * the source values in the int_field are set to the background
+   * value. */
   std::map<int, int> src_counts;
   for (auto const &n : mesh.points.mySrcs) {
     for (auto const &e : n.elements) {
@@ -295,4 +324,59 @@ bool test_point_gathscat(Ume::SOA_Idx::Mesh &mesh) {
   }
 
   return result;
+}
+
+void check_gradzatz_diffs(Mesh const &mesh, int const &centered_zone_index,
+                         VEC3V_T const &zgrad, VEC3V_T const &zgrad_invert,
+                         VEC3V_T const &pgrad, VEC3V_T const &pgrad_invert) {
+  auto const &kztyp = mesh.zones.mask;
+
+  if (zgrad != zgrad_invert) {
+    std::cout << "PE" << mesh.mype << " zgrad != zgrad_invert" << std::endl;
+    if (mesh.mype == 0) {
+      for (int z = 0; z < mesh.zones.size(); ++z) {
+        if (zgrad[z] != zgrad_invert[z]) {
+          std::cout << "Z" << z << " " << mesh.zones.mask[z] << ": " << zgrad[z]
+                    << " vs. " << zgrad_invert[z] << "\n";
+        }
+      }
+    }
+  }
+
+  if (pgrad != pgrad_invert) {
+    std::cout << "PE" << mesh.mype << " pgrad != pgrad_invert" << std::endl;
+  }
+
+  auto const &z2pz = mesh.ds->caccess_intrr("m:z>pz");
+  auto const &z2p = mesh.ds->caccess_intrr("m:z>p");
+  auto const &kptyp = mesh.points.mask;
+  std::vector<int> grad_zones;
+  for (int z = 0; z < mesh.zones.size(); ++z) {
+    if (z == centered_zone_index || kztyp[z] < 1)
+      continue;
+    if (zgrad[z] != 0.0)
+      grad_zones.push_back(z);
+  }
+
+  std::vector<int> grad_points;
+  for (int p = 0; p < mesh.points.size(); ++p) {
+    if (kptyp[p] > 0 && pgrad[p] != 0.0)
+      grad_points.push_back(p);
+  }
+
+  std::sort(grad_zones.begin(), grad_zones.end());
+  std::sort(grad_points.begin(), grad_points.end());
+  std::vector<int> diff;
+  std::ranges::set_difference(grad_zones, z2pz[centered_zone_index], std::back_inserter(diff));
+  if (!diff.empty()) {
+    std::cout << "PE" << mesh.mype << " zone diff " << diff.size() << " found "
+              << grad_zones.size() << " expected " << z2pz.size(centered_zone_index) << '\n';
+  }
+
+  diff.clear();
+  std::ranges::set_difference(grad_points, z2p[centered_zone_index], std::back_inserter(diff));
+  if (!diff.empty()) {
+    std::cout << "PE" << mesh.mype << " pt diff " << diff.size() << " found "
+              << grad_points.size() << " expected " << z2p.size(centered_zone_index) << '\n';
+  }
 }

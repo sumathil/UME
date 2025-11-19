@@ -77,6 +77,36 @@ Where there is expected to be a set of files named as if generated
 with `sprintf(filename, '%s.%05d.ume', prefix, rank)` for 0 <= rank <
 n. 
 
+There will also be two utility executables: `txt2bin` and `scale_mesh`.
+The `txt2bin` utility takes in an `.umetxt` file and converts it to
+a binary representation that is ingestible by Ume.
+```shell
+% txt2bin <infile> <filename>
+```
+Where `<infile>` is the complete file name for an UME text input
+file and `<filename>` is the name of the UME binary file to be 
+used by UME.
+
+The `scale_mesh` utility takes in an UME binary input file and 
+increases the size of the mesh by a user-chosed factor. The scaling
+factor is currently constrained to be a factor of 2.
+```shell
+% scale_mesh <prefix> 8
+```
+Where `<filename>` is the base file name for a set of UME binary input
+files.
+
+You can also run `scale_mesh` with MPI
+```
+% mpirun -np <n> scale_mesh <prefix> 8
+```
+### Run gradient kernel multiple times
+
+By default, all the kernels is run once. There is an option to run these kernels in `ume_mpi` multiple times to increase the computations for benchmarking purposes using command line argument. 
+
+```shell
+ % mpirun -np <n> ume_mpi <prefix> -i <number of iterations>
+ ```
 
 ## Project Name
 
@@ -89,6 +119,10 @@ question "oo-meh?"
 
 UME was created by Paul Henning (<phenning@lanl.gov>).
 
+UME is currently maintained by:
+Austin Bullock (<abullock@lanl.gov>)
+Sumathi Lakshmiranganatha (<sumathil@lanl.gov>)
+Jered Dominguez-Trujillo (<jereddt@lanl.gov>)
 
 ## Release
 

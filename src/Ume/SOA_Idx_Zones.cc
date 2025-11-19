@@ -16,7 +16,7 @@
 #include "Ume/SOA_Idx_Mesh.hh"
 #include "Ume/soa_idx_helpers.hh"
 #include <set>
-
+#include <iostream>
 namespace Ume {
 namespace SOA_Idx {
 
@@ -93,7 +93,14 @@ bool Zones::VAR_zone_to_pt_zone::init_() const {
   auto &z2pz = mydata_intrr();
   z2pz.init(zll);
   std::vector<std::set<int>> accum(zll);
-
+  
+/*Kokkos::View<std::set<int> *, Kokkos::HostSpace,Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_accum(&accum[0], accum.size());
+Kokkos::parallel_for("VAR_zone_to_pt_zone", cll, KOKKOS_LAMBDA (const int c) {
+int const p = c2p[c];
+int const z = c2z[c];
+if (p < pll && z < zll)
+k_accum[z].insert(p2zs[p].begin(), p2zs[p].end());
+});*/
   /* Iterate over corners, add all zones attached to c2p[c] to c2z[z]; */
   for (int c = 0; c < cll; ++c) {
     int const p = c2p[c];

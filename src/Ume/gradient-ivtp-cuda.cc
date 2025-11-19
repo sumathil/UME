@@ -32,7 +32,7 @@ using VEC3V_T = DS_Types::VEC3V_T;
 using VEC3_T = DS_Types::VEC3_T;
 
 void gradzatp(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &point_gradient) {
+    VEC3V_T &point_gradient, int cali_record) {
   auto const &csurf = mesh.ds->caccess_vec3v("corner_csurf");
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
   auto const &point_normal = mesh.ds->caccess_vec3v("point_norm");
@@ -80,7 +80,7 @@ void gradzatp(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
 }
 
 void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &zone_gradient, VEC3V_T &point_gradient) {
+    VEC3V_T &zone_gradient, VEC3V_T &point_gradient, int cali_record) {
   auto const &c_to_z_map = mesh.ds->caccess_intv("m:c>z");
   auto const &c_to_p_map = mesh.ds->caccess_intv("m:c>p");
   int const num_local_corners = mesh.corners.local_size();
@@ -88,7 +88,7 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
 
   // Get the field gradient at each mesh point.
-  gradzatp(mesh, zone_field, point_gradient);
+  gradzatp(mesh, zone_field, point_gradient, cali_record);
 
   /* Accumulate the zone volume.  Note that we need to allocate a zone field for
      volume, as we are accumulating from corners */
@@ -118,7 +118,7 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
 }
 
 void gradzatp_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &point_gradient) {
+    VEC3V_T &point_gradient, int cali_record) {
   auto const &csurf = mesh.ds->caccess_vec3v("corner_csurf");
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
   auto const &point_normal = mesh.ds->caccess_vec3v("point_norm");
@@ -199,7 +199,7 @@ void gradzatp_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
 }
 
 void gradzatz_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
-    VEC3V_T &zone_gradient, VEC3V_T &point_gradient) {
+    VEC3V_T &zone_gradient, VEC3V_T &point_gradient, int cali_record) {
   auto const &z_to_c_map = mesh.ds->caccess_intrr("m:z>c");
   auto const &c_to_p_map = mesh.ds->caccess_intv("m:c>p");
   int const num_local_zones = mesh.zones.local_size();
@@ -207,7 +207,7 @@ void gradzatz_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   auto const &corner_volume = mesh.ds->caccess_dblv("corner_vol");
 
   // Get the field gradient at each mesh point.
-  gradzatp_invert(mesh, zone_field, point_gradient);
+  gradzatp_invert(mesh, zone_field, point_gradient, cali_record);
 
   zone_gradient.assign(mesh.zones.size(), VEC3_T(0.0));
 
