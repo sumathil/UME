@@ -51,9 +51,11 @@ int main(int argc, char *argv[]) {
   /* We will read in the mesh */
   Mesh mesh;
 
-  /* We need to instantiate the MPI Transport in order to get the PE
-   * number used to form our filename and attach the communicator to
-   * the mesh. */
+  Ume::SOA_Idx::Mesh mesh;
+  Kokkos::initialize(argc, argv);
+  
+  /* We need to instantiated the MPI Transport in order to get the PE number
+     used to form our filename, */
   Ume::Comm::MPI comm(&argc, &argv);
   mesh.comm = &comm;
 
@@ -65,6 +67,10 @@ int main(int argc, char *argv[]) {
     std::cerr << "Aborting." << std::endl;
     return EXIT_FAILURE;
   }
+  size_t ic = 1; // set iteration count to 1 for default 
+  if(argc > 3 && std::string(argv[2])=="-i"){
+     ic=std::atoi(argv[3]);
+  } 
 
   size_t ic = 1; // set iteration count to 1 for default 
   if(argc > 3 && std::string(argv[2])=="-i") {
@@ -100,7 +106,9 @@ int main(int argc, char *argv[]) {
    * zone at index czi. */
   DBLV_T zfield(mesh.zones.size(), 0.0);
   zfield[czi] = 100000.0;
-
+   
+  
+  // Do a zone-centered gradient calculation on that field (in parallel)
   if (comm.pe() == 0)
     std::cout << "Computing zone-centered gradient..." << std::endl;
 
@@ -110,22 +118,28 @@ int main(int argc, char *argv[]) {
    * using inverted connectivities. */
   VEC3V_T pgrad, zgrad;
   Ume::Timer orig_time;
-  Ume::gradzatz(mesh, zfield, zgrad, pgrad);
+  Ume::gradzatz(mesh, zfield, zgrad, pgrad, 0);
   orig_time.start();
-  for (size_t i=0;i<ic;i++) {
-    Ume::gradzatz(mesh, zfield, zgrad, pgrad);
+  for (size_t i=0;i<ic;i++){
+  Ume::gradzatz(mesh, zfield, zgrad, pgrad, 1);
   }
   orig_time.stop();
 
+  double vm, rss;
+  process_mem_usage(vm, rss);
+  std::cout << "VM: " << vm << "; RSS: " << rss << std::endl;
+
   VEC3V_T pgrad_invert, zgrad_invert;
   Ume::Timer invert_time;
-  Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert);
+  Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert, 0);
   invert_time.start();
-  for (size_t i=0;i<ic;i++) {
-    Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert);
+  for (size_t i=0;i<ic;i++){
+  Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert, 1);
   }
   invert_time.stop();
 
+
+  // Double check that the gradients are non-zero where we expect
   if (comm.pe() == 0) {
     std::cout << "Original algorithm took: " << orig_time.seconds() << "s\n";
     std::cout << "Inverted algorithm took: " << invert_time.seconds() << "s\n";
@@ -175,11 +189,68 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (pgrad != pgrad_invert) {
+    std::cout << "PE" << mesh.mype << " pgrad != pgrad_invert" << std::endl;
+  }
+
+  auto const &z2pz = mesh.ds->caccess_intrr("m:z>pz");
+  auto const &z2p = mesh.ds->caccess_intrr("m:z>p");
+  auto const &kptyp = mesh.points.mask;
+  std::vector<int> grad_zones;
+  for (int z = 0; z < mesh.zones.size(); ++z) {
+    if (z == czi || kztyp[z] < 1)
+      continue;
+    if (zgrad[z] != 0.0)
+      grad_zones.push_back(z);
+  }
+
+  std::vector<int> grad_points;
+  for (int p = 0; p < mesh.points.size(); ++p) {
+    if (kptyp[p] > 0 && pgrad[p] != 0.0)
+      grad_points.push_back(p);
+  }
+
+  std::sort(grad_zones.begin(), grad_zones.end());
+  std::sort(grad_points.begin(), grad_points.end());
+  std::vector<int> diff;
+  std::ranges::set_difference(grad_zones, z2pz[czi], std::back_inserter(diff));
+  if (!diff.empty()) {
+    std::cout << "PE" << mesh.mype << " zone diff " << diff.size() << " found "
+              << grad_zones.size() << " expected " << z2pz.size(czi) << '\n';
+  }
+
+  diff.clear();
+  std::ranges::set_difference(grad_points, z2p[czi], std::back_inserter(diff));
+  if (!diff.empty()) {
+    std::cout << "PE" << mesh.mype << " pt diff " << diff.size() << " found "
+              << grad_points.size() << " expected " << z2p.size(czi) << '\n';
+  }
+
+  // Do a face area calculation
+  if (comm.pe() == 0)
+    std::cout << "Calculating face areas..." << std::endl;
+
+  // Create a result vector and initialize to impossible value
+  DBLV_T face_area(mesh.faces.size(), -100000.0);
+
+  Ume::calc_face_area(mesh, face_area, 0);
+  
+  orig_time.clear();
+  orig_time.start();
+  for (size_t i=0;i<ic;i++){
+  Ume::calc_face_area(mesh, face_area, 1);
+  }
+  orig_time.stop();
+
+  if (comm.pe() == 0)
+    std::cout << "Face area calculation took: " << orig_time.seconds() << "s\n";
+
   if (comm.pe() == 0)
     std::cout << "Done." << std::endl;
 
   comm.stop();
-  return EXIT_SUCCESS;
+  Kokkos::finalize();
+  return 0;
 }
 
 bool read_mesh(char const *const basename, int const mype, Mesh &mesh) {
@@ -193,6 +264,7 @@ bool read_mesh(char const *const basename, int const mype, Mesh &mesh) {
   }
   mesh.read(is);
   is.close();
+  mesh.print_stats(std::cout);
   return true;
 }
 

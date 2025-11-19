@@ -22,5 +22,6 @@ include(pkgs/DoxygenSupport)
 include(pkgs/KokkosSupport)
 include(pkgs/MPISupport)
 include(pkgs/OpenACCSupport)
+include(pkgs/CaliperSupport)
 
 add_subdirectory(src)

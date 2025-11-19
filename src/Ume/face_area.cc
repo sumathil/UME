@@ -12,8 +12,14 @@
 /*!
   \file Ume/face_area.cc
 */
-#include "Ume/face_area.hh"
 
+#ifdef USE_CALI
+#include <caliper/cali-manager.h>
+#include <caliper/cali.h>
+#endif
+
+#include "Ume/face_area.hh"
+#include <Kokkos_Core.hpp>
 namespace Ume {
 
 using Mesh = SOA_Idx::Mesh;
@@ -21,7 +27,7 @@ using DBLV_T = DS_Types::DBLV_T;
 using INTV_T = DS_Types::INTV_T;
 using VEC3V_T = DS_Types::VEC3V_T;
 
-void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
+void calc_face_area(Mesh &mesh, DBLV_T &face_area, int cali_record) {
   auto const &side_type = mesh.sides.mask;
   auto const &face_comm_type = mesh.faces.comm_type;
   auto const &s_to_f_map = mesh.ds->caccess_intv("m:s>f");
@@ -34,7 +40,12 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
   std::fill(face_area.begin(), face_area.end(), 0.0);
   INTV_T side_tag(sll, 0);
 
-  for (int s = 0; s < sl; ++s) {
+#ifdef USE_CALI
+  if(cali_record)
+    CALI_MARK_BEGIN("Calc_Face_Area_Loop");
+#endif
+
+ /* for (int s = 0; s < sl; ++s) {
     if (side_type[s] < 1)
       continue; // We want internal sides only
     if (side_tag[s] == 1)
@@ -48,8 +59,49 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
       int const s2 = s_to_s2_map[s];
       side_tag[s2] = 1;
     }
-  }
+  }*/
 
+
+Kokkos::View<double *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_face_area(&face_area[0], face_area.size());
+Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
+Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
+Kokkos::View<const Vec3 *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_surz(&surz[0], surz.size());
+Kokkos::View<int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_side_tag(&side_tag[0], side_tag.size());
+
+using space_t = Kokkos::DefaultExecutionSpace::memory_space;
+
+auto d_face_area = create_mirror_view ( space_t () , h_face_area );
+auto d_s_to_f_map = create_mirror_view ( space_t () , h_s_to_f_map );
+auto d_s_to_s2_map = create_mirror_view ( space_t () , h_s_to_s2_map );
+auto d_surz = create_mirror_view ( space_t () , h_surz );
+auto d_side_tag = create_mirror_view ( space_t () , h_side_tag );
+
+  Kokkos::deep_copy(d_face_area, h_face_area);
+  Kokkos::deep_copy(d_s_to_f_map, h_s_to_f_map);
+  Kokkos::deep_copy(d_s_to_s2_map, h_s_to_s2_map);
+  Kokkos::deep_copy(d_surz, h_surz);
+  Kokkos::deep_copy(d_side_tag, h_side_tag);
+
+Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
+    if (side_type[s] >= 1 && d_side_tag[s] != 1)
+    {
+    int const f = d_s_to_f_map[s];
+    if (face_comm_type[f] < 3) { // Internal or master face
+      double const side_area = vectormag(d_surz[s]); // Flat area
+      d_face_area[f] += side_area;
+
+      int const s2 = d_s_to_s2_map[s];
+      d_side_tag[s2] = 1;
+    }
+    }
+});
+Kokkos::fence();
+Kokkos::deep_copy(h_face_area, d_face_area);
+  
+#ifdef USE_CALI
+  if(cali_record)
+    CALI_MARK_END("Calc_Face_Area_Loop");
+#endif
   mesh.faces.scatter(face_area);
 }
 

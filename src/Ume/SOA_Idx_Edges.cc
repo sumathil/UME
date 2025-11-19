@@ -76,6 +76,16 @@ bool Edges::VAR_ecoord::init_() const {
     }
   }
 
+  /*Kokkos::View<Vec3 *, Kokkos::HostSpace>  local_ecoord(&ecoord[0], el);
+  
+  Kokkos::parallel_for("VAR_ecoord", el, KOKKOS_LAMBDA (const int e) {
+      if (emask[e]) {
+      local_ecoord[e] = (pcoord[e2p1[e]] + pcoord[e2p2[e]]) * 0.5;
+    } else{
+      local_ecoord[e] =0.0;
+    }
+   });*/
+
   VAR_INIT_EPILOGUE;
 }
 

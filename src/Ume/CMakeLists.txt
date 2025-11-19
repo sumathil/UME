@@ -52,15 +52,21 @@ add_library(Ume
   SOA_Idx_Sides.cc
   SOA_Idx_Zones.cc
   SOA_Idx_Iotas.cc
+  #gradient-allkokkos_cpu.cc
+ # gradient-ivtp-cuda.cc
+  #gradient-point+zone-cuda.cc
+  gradient_all_gpu.cc
   face_area.cc
   gradient.cc
   renumbering.cc
   utils.cc
   )
 
+
 set_target_properties(Ume PROPERTIES
   COMPILE_DEFINITIONS "${COMMON_COMPILE_DEFINITIONS}"
   COMPILE_OPTIONS "${COMMON_COMPILE_OPTIONS}"
+  CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --expt-relaxed-constexpr"
   OUTPUT_NAME "ume"
   )
 
@@ -70,10 +76,18 @@ target_include_directories(Ume
   $<INSTALL_INTERFACE:include/Ume>
   )
 
+if (USE_CALIPER)
+  target_include_directories(Ume PUBLIC ${caliper_INCLUDE_DIR})
+  target_compile_definitions(Ume PUBLIC USE_CALI)
+  target_link_libraries(Ume PUBLIC caliper)
+endif()
+
 target_link_libraries(Ume
   PUBLIC
   ${COMMON_LINK_LIBRARIES}
-  )
+  PUBLIC
+    Kokkos::kokkos
+    )
 
 target_compile_options(Ume
   PRIVATE ${WARNING_FLAGS}
