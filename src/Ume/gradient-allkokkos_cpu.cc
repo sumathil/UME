@@ -13,6 +13,7 @@
   \file Ume/gradient.cc
 */
 #include <Kokkos_Core.hpp>
+#include<Kokkos_ScatterView.hpp>
 #include <iostream>
 #include <omp.h>
 #include "Ume/gradient.hh"
@@ -121,34 +122,41 @@ zatz_time.start();
 Kokkos::View<const int *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged> > k_c_to_z_map(&c_to_z_map[0], c_to_z_map.size());
 Kokkos::View<const int *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged> > k_c_to_p_map(&c_to_p_map[0], c_to_p_map.size());
 Kokkos::View<const double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_corner_volume(&corner_volume[0], corner_volume.size());
-Kokkos::View<double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>>  k_zone_volume(&zone_volume[0], zone_volume.size());
+Kokkos::View<double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_zone_volume(&zone_volume[0], zone_volume.size());
+//Kokkos::Experimental::ScatterView<double *>  s_zone_volume(k_zone_volume);
 Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_point_gradient(&point_gradient[0], point_gradient.size());
 Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_corner_type(&corner_type[0], corner_type.size());
 
 
 // scatterview
-  Kokkos::parallel_for("gradzatp-ivt", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
+  Kokkos::parallel_for("gradzatz", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
     if (k_corner_type[corner_idx] >= 1){
       int const zone_idx = k_c_to_z_map[corner_idx];
+      auto l_zone_volume=k_zone_volume[zone_idx];
+      //auto access = s_zone_volume.access();
       /* Note that we cannot parallelize across corners, as multiple corners
        write to the same zone. */
-      k_zone_volume[zone_idx] += k_corner_volume[corner_idx];
+      l_zone_volume += k_corner_volume[corner_idx];
+      k_zone_volume[zone_idx]=l_zone_volume;
     }
   });
+  //Kokkos::Experimental::contribute(k_zone_volume,s_zone_volume);
 
 
   // Accumulate the zone-centered gradient
   zone_gradient.assign(mesh.zones.size(), VEC3_T(0.0));
 
 // scatterview  
-  Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>> k_zone_gradient(&zone_gradient[0], zone_gradient.size());
-  Kokkos::parallel_for("gradzatp-ivt", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
+  Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_zone_gradient(&zone_gradient[0], zone_gradient.size());
+  Kokkos::parallel_for("gradzatz", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
     if (k_corner_type[corner_idx] >= 1){
       int const zone_idx = k_c_to_z_map[corner_idx];
       int const point_idx = k_c_to_p_map[corner_idx];
+      auto l_zone_gradient = k_zone_gradient[zone_idx];
       double const c_z_vol_ratio =
       k_corner_volume[corner_idx] / k_zone_volume[zone_idx];
-      k_zone_gradient[zone_idx] += k_point_gradient[point_idx] * c_z_vol_ratio;
+      l_zone_gradient += k_point_gradient[point_idx] * c_z_vol_ratio;
+      k_zone_gradient[zone_idx] = l_zone_gradient;
      }
     });
    
@@ -179,8 +187,8 @@ zatpivt_time.start();
 
 Kokkos::View<const int *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged> > k_c_to_z_map(&c_to_z_map[0], c_to_z_map.size());
 Kokkos::View<const double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_corner_volume(&corner_volume[0], corner_volume.size());
-Kokkos::View<double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>>  k_point_volume(&point_volume[0], point_volume.size());
-Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>> k_point_gradient(&point_gradient[0], point_gradient.size());
+Kokkos::View<double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_point_volume(&point_volume[0], point_volume.size());
+Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_point_gradient(&point_gradient[0], point_gradient.size());
 Kokkos::View<const Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_csurf(&csurf[0], csurf.size());
 Kokkos::View<const double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_zone_field(&zone_field[0], zone_field.size());
 Kokkos::View<const Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_point_normal(&point_normal[0], point_normal.size());
@@ -190,22 +198,28 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
   Kokkos::parallel_for("gradzatp-ivt", num_local_points, KOKKOS_LAMBDA (const int point_idx) {
     for (int const &corner_idx : p_to_c_map[point_idx]) {
       int const zone_idx = k_c_to_z_map[corner_idx];
-      k_point_volume[point_idx] += k_corner_volume[corner_idx];
-      k_point_gradient[point_idx] += k_csurf[corner_idx] * k_zone_field[zone_idx];
+      auto l_point_volume=k_point_volume[point_idx];
+      auto l_point_gradient=k_point_gradient[point_idx];
+      l_point_volume += k_corner_volume[corner_idx];
+      l_point_gradient += k_csurf[corner_idx] * k_zone_field[zone_idx];
+      k_point_volume[point_idx]=l_point_volume;
+      k_point_gradient[point_idx]=l_point_gradient;
     }
   });
 
    Kokkos::parallel_for("gradzatp-ivt-2", num_local_points, KOKKOS_LAMBDA (const int point_idx) {
+     auto l_point_gradient=k_point_gradient[point_idx];
     if (k_point_type[point_idx] > 0) {
       // Internal point
-      k_point_gradient[point_idx] =k_point_gradient[point_idx]/ k_point_volume[point_idx];
+      l_point_gradient /= k_point_volume[point_idx];
     } else if (k_point_type[point_idx] == -1) {
       // Mesh boundary point
       double const ppdot =
-          dotprod(k_point_gradient[point_idx], k_point_normal[point_idx]);
-      k_point_gradient[point_idx] = (k_point_gradient[point_idx] - k_point_normal[point_idx] * ppdot) /
+          dotprod(l_point_gradient, k_point_normal[point_idx]);
+      l_point_gradient = (l_point_gradient - k_point_normal[point_idx] * ppdot) /
           k_point_volume[point_idx];
     }
+    k_point_gradient[point_idx]=l_point_gradient;
   });
 
 zatpivt_time.stop();
@@ -232,10 +246,11 @@ zatzivt_time.start();
 Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_zone_type(&zone_type[0], zone_type.size());
 Kokkos::View<const double *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  k_corner_volume(&corner_volume[0], corner_volume.size());
 Kokkos::View<const int *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged> > k_c_to_p_map(&c_to_p_map[0], c_to_p_map.size());
-Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Atomic>> k_zone_gradient(&zone_gradient[0], zone_gradient.size());
+Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_zone_gradient(&zone_gradient[0], zone_gradient.size());
 Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_point_gradient(&point_gradient[0], point_gradient.size());
 
 Kokkos::parallel_for("gradzatz-ivt-1", num_local_zones, KOKKOS_LAMBDA (const int zone_idx) {
+  auto l_zone_gradient=k_zone_gradient[zone_idx];
     if (k_zone_type[zone_idx] >= 1){
       // Only operate on local interior zones
 
@@ -248,9 +263,10 @@ Kokkos::parallel_for("gradzatz-ivt-1", num_local_zones, KOKKOS_LAMBDA (const int
       for (int const &corner_idx : z_to_c_map[zone_idx]) {
         int const point_idx = k_c_to_p_map[corner_idx];
         double const c_z_vol_ratio = k_corner_volume[corner_idx] / zone_volume;
-        k_zone_gradient[zone_idx] += k_point_gradient[point_idx] * c_z_vol_ratio;
+        l_zone_gradient += k_point_gradient[point_idx] * c_z_vol_ratio;
       }
     }
+    k_zone_gradient[zone_idx]=l_zone_gradient;
   });
 
 zatzivt_time.stop();
