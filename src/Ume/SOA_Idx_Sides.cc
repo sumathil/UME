@@ -129,7 +129,7 @@ bool Sides::VAR_side_surf::init_() const {
  
   /*
    * This for loop is converted to kokkos parallel_for
-   *
+   */
   for (int s = 0; s < sl; ++s) {
     if (smask[s] > 0) {
       // A real side in the interior of the mesh
@@ -150,7 +150,7 @@ bool Sides::VAR_side_surf::init_() const {
       local_side_surf[s] = 0.0;
     }
       side_surf[s] = local_side_surf[s];
-  }*/
+  }
 
   
   
