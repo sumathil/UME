@@ -138,18 +138,17 @@ bool Sides::VAR_side_surf::init_() const {
       Vec3 const &fp = fx[s2f[s]];
       // Area-weighted normal of triangle <ep, fp, zc>.  The corners that
       // intersect this side share a face in the plane of that triangle. 
-      local_side_surf[s] = crossprod(ep - zc, fp - zc) / 2.0;
+      side_surf[s] = crossprod(ep - zc, fp - zc) / 2.0;
     } else if (smask[s] < 0) {
       // A ghost side on a mesh boundary face.  There isn't really a zx here, so
       //   we compute it differently 
       Vec3 const &fc = fx[s2f[s]];
       Vec3 const &p1 = px[s2p1[s]];
       Vec3 const &p2 = px[s2p2[s]];
-      local_side_surf[s] = crossprod(p1 - fc, p2 - fc) / 4.0; // Deliberate
+      side_surf[s] = crossprod(p1 - fc, p2 - fc) / 4.0; // Deliberate
     } else{
-      local_side_surf[s] = 0.0;
+      side_surf[s] = 0.0;
     }
-      side_surf[s] = local_side_surf[s];
   }
 
   

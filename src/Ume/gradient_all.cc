@@ -69,7 +69,7 @@ Kokkos::View<const short *, KOKKOS_SPACE>  h_corner_type(&corner_type[0], corner
 
  // Kokkos mirror views
   auto d_point_gradient = create_mirror_view ( space_t (), h_point_gradient );
-  short int d_point_type = create_mirror_view ( space_t () , h_point_type );
+  auto d_point_type = create_mirror_view ( space_t () , h_point_type );
   auto d_point_volume = create_mirror_view ( space_t () , h_point_volume );
   auto d_point_normal = create_mirror_view ( space_t () , h_point_normal );
 
@@ -83,6 +83,7 @@ Kokkos::View<const short *, KOKKOS_SPACE>  h_corner_type(&corner_type[0], corner
 
 
    // copy host to device
+   #ifdef KOKKOS_ENABLE_CUDA
   Kokkos::deep_copy(d_point_gradient, h_point_gradient);
   Kokkos::deep_copy(d_point_type, h_point_type);
   Kokkos::deep_copy(d_point_volume, h_point_volume);
@@ -93,6 +94,7 @@ Kokkos::View<const short *, KOKKOS_SPACE>  h_corner_type(&corner_type[0], corner
   Kokkos::deep_copy(d_zone_field, h_zone_field);
   Kokkos::deep_copy(d_c_to_p_map, h_c_to_p_map);
   Kokkos::deep_copy(d_corner_type, h_corner_type);
+  #endif
 
   Kokkos::parallel_for("gradzatp-1", cl, KOKKOS_LAMBDA (const int c) {
     if (d_corner_type[c] >= 1) {  
@@ -102,10 +104,12 @@ Kokkos::View<const short *, KOKKOS_SPACE>  h_corner_type(&corner_type[0], corner
       d_point_gradient[p] += d_csurf[c] * d_zone_field[z];
     }
   });
-
+ 
+ #ifdef KOKKOS_ENABLE_CUDA
   Kokkos::deep_copy(h_point_volume, d_point_volume);
   Kokkos::deep_copy(h_point_gradient, d_point_gradient);
-  
+  #endif
+
   mesh.points.gathscat(Ume::Comm::Op::SUM, point_volume);
   mesh.points.gathscat(Ume::Comm::Op::SUM, point_gradient);
 
