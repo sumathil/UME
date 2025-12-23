@@ -39,7 +39,7 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
 
   std::fill(face_area.begin(), face_area.end(), 0.0);
   INTV_T side_tag(sll, 0);
-
+ 
  /* for (int s = 0; s < sl; ++s) {
     if (side_type[s] < 1)
       continue; // We want internal sides only
@@ -93,18 +93,20 @@ Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
 Kokkos::fence();
 Kokkos::deep_copy(h_face_area, d_face_area);*/
 
-Kokkos::View<double *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_face_area(&face_area[0], face_area.size());
-Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
-Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
-Kokkos::View<const Vec3 *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_surz(&surz[0], surz.size());
-Kokkos::View<int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  local_side_tag(&side_tag[0], side_tag.size());
+Kokkos::View<double *, Kokkos::HostSpace>  local_face_area(&face_area[0], face_area.size());
+Kokkos::View<const int *, Kokkos::HostSpace>  local_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
+Kokkos::View<const int *, Kokkos::HostSpace>  local_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
+Kokkos::View<const Vec3 *, Kokkos::HostSpace>  local_surz(&surz[0], surz.size());
+Kokkos::View<int *, Kokkos::HostSpace>  local_side_tag(&side_tag[0], side_tag.size());
+Kokkos::View<const short *, Kokkos::HostSpace>  local_side_type(&side_type[0], side_type.size());
+Kokkos::View<const int *, Kokkos::HostSpace>  local_face_comm_type(&face_comm_type[0], face_comm_type.size());
 
 
 Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
-    if (side_type[s] >= 1 && side_tag[s] != 1)
+    if (local_side_type[s] >= 1 && local_side_tag[s] != 1)
     {
     int const f = local_s_to_f_map[s];
-    if (face_comm_type[f] < 3) { // Internal or master face
+    if (local_face_comm_type[f] < 3) { // Internal or master face
       double const side_area = vectormag(local_surz[s]); // Flat area
       local_face_area[f] += side_area;
 
