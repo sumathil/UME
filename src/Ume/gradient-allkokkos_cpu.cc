@@ -128,7 +128,7 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
 
 
 // scatterview
-  Kokkos::parallel_for("gradzatp-ivt", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
+  Kokkos::parallel_for("gradzatz-1", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
     if (k_corner_type[corner_idx] >= 1){
       int const zone_idx = k_c_to_z_map[corner_idx];
       /* Note that we cannot parallelize across corners, as multiple corners
@@ -144,7 +144,7 @@ Kokkos::View<const short *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged
 
 // scatterview  
   Kokkos::View<Vec3 *, KOKKOS_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_zone_gradient(&zone_gradient[0], zone_gradient.size());
-  Kokkos::parallel_for("gradzatp-ivt", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
+  Kokkos::parallel_for("gradzatz-2", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
     if (k_corner_type[corner_idx] >= 1){
       int const zone_idx = k_c_to_z_map[corner_idx];
       int const point_idx = k_c_to_p_map[corner_idx];
