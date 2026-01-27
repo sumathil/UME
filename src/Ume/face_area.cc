@@ -57,16 +57,16 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
   }
 
 */
-
-Kokkos::View<double *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_face_area(&face_area[0], face_area.size());
-Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
-Kokkos::View<const int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
-Kokkos::View<const Vec3 *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_surz(&surz[0], surz.size());
-Kokkos::View<int *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_side_tag(&side_tag[0], side_tag.size());
-Kokkos::View<const short *, Kokkos::HostSpace>  h_side_type(&side_type[0], side_type.size());
-Kokkos::View<const int *, Kokkos::HostSpace>  h_face_comm_type(&face_comm_type[0], face_comm_type.size());
-
+#define HOST_SPACE Kokkos::HostSpace
 using space_t = Kokkos::DefaultExecutionSpace::memory_space;
+
+Kokkos::View<double *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_face_area(&face_area[0], face_area.size());
+Kokkos::View<const int *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
+Kokkos::View<const int *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
+Kokkos::View<const Vec3 *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_surz(&surz[0], surz.size());
+Kokkos::View<int *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_side_tag(&side_tag[0], side_tag.size());
+Kokkos::View<const short *, HOST_SPACE>  h_side_type(&side_type[0], side_type.size());
+Kokkos::View<const int *, HOST_SPACE>  h_face_comm_type(&face_comm_type[0], face_comm_type.size());
 
 auto d_face_area = create_mirror_view ( space_t () , h_face_area );
 auto d_s_to_f_map = create_mirror_view ( space_t () , h_s_to_f_map );
@@ -76,14 +76,15 @@ auto d_side_tag = create_mirror_view ( space_t () , h_side_tag );
 auto d_side_type = create_mirror_view ( space_t () , h_side_type );
 auto d_face_comm_type = create_mirror_view ( space_t () , h_face_comm_type );
 
-  Kokkos::deep_copy(d_face_area, h_face_area);
-  Kokkos::deep_copy(d_s_to_f_map, h_s_to_f_map);
-  Kokkos::deep_copy(d_s_to_s2_map, h_s_to_s2_map);
-  Kokkos::deep_copy(d_surz, h_surz);
-  Kokkos::deep_copy(d_side_tag, h_side_tag);
-  Kokkos::deep_copy(d_side_type, h_side_type);
-  Kokkos::deep_copy(d_face_comm_type, h_face_comm_type);
-
+#ifdef KOKKOS_ENABLE_CUDA
+Kokkos::deep_copy(d_face_area, h_face_area);
+Kokkos::deep_copy(d_s_to_f_map, h_s_to_f_map);
+Kokkos::deep_copy(d_s_to_s2_map, h_s_to_s2_map);
+Kokkos::deep_copy(d_surz, h_surz);
+Kokkos::deep_copy(d_side_tag, h_side_tag);
+Kokkos::deep_copy(d_side_type, h_side_type);
+Kokkos::deep_copy(d_face_comm_type, h_face_comm_type);
+#endif
 Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
     if (d_side_type[s] >= 1 && d_side_tag[s] != 1)
     {
@@ -97,9 +98,11 @@ Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
     }
     }
 });
+
+#ifdef KOKKOS_ENABLE_CUDA
 Kokkos::fence();
 Kokkos::deep_copy(h_face_area, d_face_area);
-
+#endif
 /*Kokkos::View<double *, Kokkos::HostSpace>  local_face_area(&face_area[0], face_area.size());
 Kokkos::View<const int *, Kokkos::HostSpace>  local_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
 Kokkos::View<const int *, Kokkos::HostSpace>  local_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());

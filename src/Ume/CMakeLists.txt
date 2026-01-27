@@ -52,11 +52,11 @@ add_library(Ume
   SOA_Idx_Sides.cc
   SOA_Idx_Zones.cc
   SOA_Idx_Iotas.cc
-  gradient-allkokkos_cpu.cc
+  #gradient-allkokkos_cpu.cc
   #gradient_all.cc
- # gradient-ivtp-cuda.cc
+  #gradient-ivtp-cuda.cc
   #gradient-point+zone-cuda.cc
-  #gradient_all_gpu.cc
+  gradient_all_gpu.cc
   face_area.cc
   #gradient.cc
   renumbering.cc
