@@ -145,18 +145,15 @@ public:
     lhs /= rhs;
     return lhs;
   }
-  KOKKOS_INLINE_FUNCTION
+  
   constexpr auto operator<=>(const_ref rhs) const = default;
-  KOKKOS_INLINE_FUNCTION
   constexpr bool operator==(const_ref rhs) const = default;
-  KOKKOS_INLINE_FUNCTION
   constexpr bool operator==(T const &rhs) const {
     return std::all_of(
         data_.begin(), data_.end(), [rhs](int i) { return i == rhs; });
   }
-  KOKKOS_INLINE_FUNCTION
   constexpr bool operator!=(T const &rhs) const { return !(*this == rhs); }
-  //KOKKOS_INLINE_FUNCTION
+ 
   friend std::ostream &operator<<(std::ostream &os, const_ref vec) {
     char const *delim = "";
     os << '<';
