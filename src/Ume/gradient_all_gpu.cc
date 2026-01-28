@@ -13,13 +13,7 @@
   \file Ume/gradient.cc
 */
 
-#ifdef USE_CALI
-#include <caliper/cali-manager.h>
-#include <caliper/cali.h>
-#endif
-
 #include "Ume/gradient.hh"
-#include <iostream>
 #include <Kokkos_Core.hpp>
 
 namespace Ume {
@@ -59,18 +53,18 @@ void gradzatp(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   Kokkos::View<const short *, KOKKOS_SPACE>  h_point_type(&point_type[0], point_type.size());
   Kokkos::View<const short *, KOKKOS_SPACE>  h_corner_type(&corner_type[0], corner_type.size()); 
 
-  auto d_point_gradient = create_mirror_view ( space_t{}, h_point_gradient );
-  auto d_point_type = create_mirror_view ( space_t{}, h_point_type );
-  auto d_point_volume = create_mirror_view ( space_t{}, h_point_volume );
-  auto d_point_normal = create_mirror_view ( space_t{}, h_point_normal );
+  auto d_point_gradient = create_mirror_view ( space_t (), h_point_gradient );
+  auto d_point_type = create_mirror_view ( space_t (), h_point_type );
+  auto d_point_volume = create_mirror_view ( space_t (), h_point_volume );
+  auto d_point_normal = create_mirror_view ( space_t (), h_point_normal );
   
-  auto d_c_to_z_map = create_mirror_view ( space_t{}, h_c_to_z_map );
-  auto d_csurf = create_mirror_view ( space_t{}, h_csurf );
-  auto d_corner_volume = create_mirror_view (space_t{}, h_corner_volume );
-  auto d_zone_field = create_mirror_view ( space_t{},h_zone_field );
+  auto d_c_to_z_map = create_mirror_view ( space_t (), h_c_to_z_map );
+  auto d_csurf = create_mirror_view ( space_t (), h_csurf );
+  auto d_corner_volume = create_mirror_view (space_t (), h_corner_volume );
+  auto d_zone_field = create_mirror_view ( space_t (),h_zone_field );
 
-  auto d_c_to_p_map = create_mirror_view ( space_t{},h_c_to_p_map );
-  auto d_corner_type = create_mirror_view ( space_t{},h_corner_type );
+  auto d_c_to_p_map = create_mirror_view ( space_t (),h_c_to_p_map );
+  auto d_corner_type = create_mirror_view ( space_t (),h_corner_type );
 
   #ifdef KOKKOS_ENABLE_CUDA
   Kokkos::deep_copy(d_point_gradient, h_point_gradient);
@@ -84,6 +78,7 @@ void gradzatp(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   Kokkos::deep_copy(d_c_to_p_map, h_c_to_p_map);
   Kokkos::deep_copy(d_corner_type, h_corner_type);
   #endif
+
   Kokkos::parallel_for("gradzatz-1-cuda", cl, KOKKOS_LAMBDA (const int c) {
     if (d_corner_type[c] >= 1){  
       // Only operate on interior corners
@@ -220,68 +215,43 @@ void gradzatp_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   DBLV_T point_volume(num_points, 0.0);
   point_gradient.assign(num_points, VEC3_T(0.0));
 
-  for (int point_idx = 0; point_idx < num_local_points; ++point_idx) {
-    for (int const &corner_idx : p_to_c_map[point_idx]) {
-      int const zone_idx = c_to_z_map[corner_idx];
-      point_volume[point_idx] += corner_volume[corner_idx];
-      point_gradient[point_idx] += csurf[corner_idx] * zone_field[zone_idx];
-    }
-  }
+  #define KOKKOS_SPACE Kokkos::HostSpace
+  using Execspace = Kokkos::HostSpace::execution_space;
+
+  Kokkos::View<const int *, KOKKOS_SPACE > h_c_to_z_map(&c_to_z_map[0], c_to_z_map.size());
+  Kokkos::View<const double *, KOKKOS_SPACE>  h_corner_volume(&corner_volume[0], corner_volume.size());
+  Kokkos::View<double *, KOKKOS_SPACE>  h_point_volume(&point_volume[0], point_volume.size());
+  Kokkos::View<Vec3 *, KOKKOS_SPACE> h_point_gradient(&point_gradient[0], point_gradient.size());
+  Kokkos::View<const Vec3 *, KOKKOS_SPACE>  h_csurf(&csurf[0], csurf.size());
+  Kokkos::View<const double *, KOKKOS_SPACE> h_zone_field(&zone_field[0], zone_field.size());
+  Kokkos::View<const Vec3 *, KOKKOS_SPACE>  h_point_normal(&point_normal[0], point_normal.size());
+  Kokkos::View<const short *, KOKKOS_SPACE>  h_point_type(&point_type[0], point_type.size());
 
 
+  Kokkos::parallel_for("gradzatp-ivt", Kokkos::RangePolicy<Execspace>(0,num_local_points), [&] (const int point_idx) {
+      for (int const &corner_idx : p_to_c_map[point_idx]) {
+        int const zone_idx = h_c_to_z_map[corner_idx];
+        h_point_volume[point_idx] += h_corner_volume[corner_idx];
+        h_point_gradient[point_idx] += h_csurf[corner_idx] * h_zone_field[zone_idx];
+      }
+    });
+
+// check for gathscat in gradient.cc
   mesh.points.gathscat(Ume::Comm::Op::SUM, point_volume);
   mesh.points.gathscat(Ume::Comm::Op::SUM, point_gradient);
 
-  /*
-    Divide by point control volume to get gradient.  If a point is on the outer
-    perimeter of the mesh (POINT_TYPE=-1), subtract the outward normal component
-    of the gradient using the point normals.
-   */
-
-#define HOST_SPACE Kokkos::HostSpace
-
-// #define GPU_SPACE Kokkos::SharedSpace
-
-  using space_t = Kokkos::DefaultExecutionSpace::memory_space;
-
-  //Kokkos host views
-  Kokkos::View<Vec3 *, HOST_SPACE> h_point_gradient(&point_gradient[0], point_gradient.size());
-  Kokkos::View<const short *, HOST_SPACE>  h_point_type(&point_type[0], point_type.size());
-  Kokkos::View<double *, HOST_SPACE>  h_point_volume(&point_volume[0], point_volume.size());
-  Kokkos::View<const Vec3 *, HOST_SPACE>  h_point_normal(&point_normal[0], point_normal.size());
-
-  // Kokkos mirror views
-  auto d_point_gradient = create_mirror_view ( space_t () , h_point_gradient );
-  auto d_point_type = create_mirror_view ( space_t () , h_point_type );
-  auto d_point_volume = create_mirror_view ( space_t () , h_point_volume );
-  auto d_point_normal = create_mirror_view ( space_t () , h_point_normal );
-
-  // copy host to device
-  #ifdef KOKKOS_ENABLE_CUDA
-  Kokkos::deep_copy(d_point_gradient, h_point_gradient);
-  Kokkos::deep_copy(d_point_type, h_point_type);
-  Kokkos::deep_copy(d_point_volume, h_point_volume);
-  Kokkos::deep_copy(d_point_normal, h_point_normal);
-  #endif
-
-  // calculate on device
-  Kokkos::parallel_for("gradzatp-ivt-2-cuda", num_local_points, KOKKOS_LAMBDA (const int point_idx) {
-    if (d_point_type[point_idx] > 0) {
+  Kokkos::parallel_for("gradzatp-ivt-2", Kokkos::RangePolicy<Execspace>(0,num_local_points), [&] (const int point_idx) {
+    if (h_point_type[point_idx] > 0) {
       // Internal point
-      d_point_gradient[point_idx] /= d_point_volume[point_idx];
-    } 
-    else if (d_point_type[point_idx] == -1) {
+      h_point_gradient[point_idx] =h_point_gradient[point_idx]/ h_point_volume[point_idx];
+    } else if (h_point_type[point_idx] == -1) {
       // Mesh boundary point
-      double const ppdot = dotprod(d_point_gradient[point_idx], d_point_normal[point_idx]);
-      d_point_gradient[point_idx] = (d_point_gradient[point_idx] - d_point_normal[point_idx] * ppdot) /
-          d_point_volume[point_idx];
+      double const ppdot =
+          dotprod(h_point_gradient[point_idx], h_point_normal[point_idx]);
+      h_point_gradient[point_idx] = (h_point_gradient[point_idx] - h_point_normal[point_idx] * ppdot) /
+          h_point_volume[point_idx];
     }
   });
-  #ifdef KOKKOS_ENABLE_CUDA
-  Kokkos::fence();
-  Kokkos::deep_copy(h_point_gradient, d_point_gradient);
-  #endif
-  
   mesh.points.scatter(point_gradient);
 }
 
@@ -295,26 +265,36 @@ void gradzatz_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
 
   // Get the field gradient at each mesh point.
   gradzatp_invert(mesh, zone_field, point_gradient);
-
   zone_gradient.assign(mesh.zones.size(), VEC3_T(0.0));
- 
-  for (int zone_idx = 0; zone_idx < num_local_zones; ++zone_idx) {
-    if (zone_type[zone_idx] < 1)
-      continue; // Only operate on local interior zones
 
-    // Accumulate the (local) zone volume
-    double zone_volume{0.0}; // Only need a local volume
-    for (int const &corner_idx : z_to_c_map[zone_idx]) {
-      zone_volume += corner_volume[corner_idx];
-    }
+  #define KOKKOS_SPACE Kokkos::HostSpace
+  using Execspace = Kokkos::HostSpace::execution_space;
 
-    for (int const &corner_idx : z_to_c_map[zone_idx]) {
-      int const point_idx = c_to_p_map[corner_idx];
-      double const c_z_vol_ratio = corner_volume[corner_idx] / zone_volume;
-      zone_gradient[zone_idx] += point_gradient[point_idx] * c_z_vol_ratio;
-    }
-  }
- 
+  Kokkos::View<const short *, KOKKOS_SPACE>  h_zone_type(&zone_type[0], zone_type.size());
+  Kokkos::View<const double *, KOKKOS_SPACE>  h_corner_volume(&corner_volume[0], corner_volume.size());
+  Kokkos::View<const int *, KOKKOS_SPACE> h_c_to_p_map(&c_to_p_map[0], c_to_p_map.size());
+  Kokkos::View<Vec3 *, KOKKOS_SPACE> h_zone_gradient(&zone_gradient[0], zone_gradient.size());
+  Kokkos::View<Vec3 *, KOKKOS_SPACE> h_point_gradient(&point_gradient[0], point_gradient.size());
+
+
+  Kokkos::parallel_for("gradzatz-ivt-1", Kokkos::RangePolicy<Execspace>(0,num_local_zones), [&] (const int zone_idx) {
+      if (h_zone_type[zone_idx] >= 1){
+        // Only operate on local interior zones
+
+        // Accumulate the (local) zone volume
+        double zone_volume{0.0}; // Only need a local volume
+        for (int const &corner_idx : z_to_c_map[zone_idx]) {
+          zone_volume += h_corner_volume[corner_idx];
+        }
+
+        for (int const &corner_idx : z_to_c_map[zone_idx]) {
+          int const point_idx = h_c_to_p_map[corner_idx];
+          double const c_z_vol_ratio = h_corner_volume[corner_idx] / zone_volume;
+          h_zone_gradient[zone_idx] += h_point_gradient[point_idx] * c_z_vol_ratio;
+        }
+      }
+    });
+
   mesh.zones.scatter(zone_gradient);
 }
 
