@@ -17,6 +17,7 @@
 #include "Ume/soa_idx_helpers.hh"
 #include <set>
 #include <iostream>
+
 namespace Ume {
 namespace SOA_Idx {
 
@@ -64,20 +65,47 @@ bool Zones::VAR_zcoord::init_() const {
   zcoord.resize(zll, Vec3(0.0));
 
   std::vector<int> num_zone_pts(zl, 0);
-  for (int c = 0; c < cl; ++c) {
+  
+  Kokkos::View<Vec3 *, Kokkos::HostSpace>  h_zcoord(&zcoord[0], zcoord.size());
+  Kokkos::View<const Vec3 *, Kokkos::HostSpace>  h_pcoord(&pcoord[0], pcoord.size());
+  Kokkos::View<const short *, Kokkos::HostSpace>  h_cmask(&cmask[0], cmask.size());
+  Kokkos::View<const int *, Kokkos::HostSpace>  h_c2z(c2z.data(), c2z.size());
+  Kokkos::View<const int *, Kokkos::HostSpace>  h_c2p(c2p.data(), c2p.size());
+  Kokkos::View<int *, Kokkos::HostSpace>  h_num_zone_pts(num_zone_pts.data(), num_zone_pts.size()); 
+  
+  using Execspace = Kokkos::HostSpace::execution_space;
+
+  Kokkos::parallel_for("VAR_zcoord", Kokkos::RangePolicy<Execspace>(0, cl),[&] (const int c) {
+    if (h_cmask[c]) {
+      int const z = h_c2z[c];
+      h_zcoord[z] += h_pcoord[h_c2p[c]];
+      h_num_zone_pts.access(z) += 1;
+    }
+  });
+
+  /*for (int c = 0; c < cl; ++c) {
     if (cmask[c]) {
       int const z = c2z[c];
       zcoord[z] += pcoord[c2p[c]];
       num_zone_pts.at(z) += 1;
     }
-  }
+  }*/
 
   auto const &zmask{zones().mask};
-  for (int z = 0; z < zl; ++z) {
+
+  Kokkos::View<const short *, Kokkos::HostSpace>  h_zmask(&zmask[0], zmask.size());
+  
+  Kokkos::parallel_for("VAR_zcoord-1", Kokkos::RangePolicy<Execspace>(0, zl),[&] (const int z) {
+    if (h_zmask[z]) {
+      h_zcoord[z] /= static_cast<double>(h_num_zone_pts[z]);
+    }
+  });
+
+  /*for (int z = 0; z < zl; ++z) {
     if (zmask[z]) {
       zcoord[z] /= static_cast<double>(num_zone_pts[z]);
     }
-  }
+  }*/
   zones().scatter(zcoord);
   VAR_INIT_EPILOGUE;
 }
@@ -94,13 +122,6 @@ bool Zones::VAR_zone_to_pt_zone::init_() const {
   z2pz.init(zll);
   std::vector<std::set<int>> accum(zll);
   
-/*Kokkos::View<std::set<int> *, Kokkos::HostSpace,Kokkos::MemoryTraits<Kokkos::Unmanaged>> k_accum(&accum[0], accum.size());
-Kokkos::parallel_for("VAR_zone_to_pt_zone", cll, KOKKOS_LAMBDA (const int c) {
-int const p = c2p[c];
-int const z = c2z[c];
-if (p < pll && z < zll)
-k_accum[z].insert(p2zs[p].begin(), p2zs[p].end());
-});*/
   /* Iterate over corners, add all zones attached to c2p[c] to c2z[z]; */
   for (int c = 0; c < cll; ++c) {
     int const p = c2p[c];
