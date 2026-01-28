@@ -68,17 +68,18 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
   Kokkos::deep_copy(d_side_type, h_side_type);
   Kokkos::deep_copy(d_face_comm_type, h_face_comm_type);
   #endif
+
   Kokkos::parallel_for("face_area", sl, KOKKOS_LAMBDA (const int s) {
       if (d_side_type[s] >= 1 && d_side_tag[s] != 1)
       {
-      int const f = d_s_to_f_map[s];
-      if (d_face_comm_type[f] < 3) { // Internal or master face
-        double const side_area = vectormag(d_surz[s]); // Flat area
-        d_face_area[f] += side_area;
+        int const f = d_s_to_f_map[s];
+        if (d_face_comm_type[f] < 3) { // Internal or master face
+          double const side_area = vectormag(d_surz[s]); // Flat area
+          d_face_area[f] += side_area;
 
-        int const s2 = d_s_to_s2_map[s];
-        d_side_tag[s2] = 1;
-      }
+          int const s2 = d_s_to_s2_map[s];
+          d_side_tag[s2] = 1;
+        }
       }
   });
 
@@ -86,6 +87,7 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
   Kokkos::fence();
   Kokkos::deep_copy(h_face_area, d_face_area);
   #endif
+  
     mesh.faces.scatter(face_area);
   }
 
