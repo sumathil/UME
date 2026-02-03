@@ -52,9 +52,8 @@ add_library(Ume
   SOA_Idx_Sides.cc
   SOA_Idx_Zones.cc
   SOA_Idx_Iotas.cc
-  gradient_kokkos.cc
   face_area.cc
-  #gradient.cc
+  gradient.cc
   renumbering.cc
   utils.cc
   )
