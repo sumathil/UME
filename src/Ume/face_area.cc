@@ -43,11 +43,11 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
   #define HOST_SPACE Kokkos::HostSpace
   using space_t = Kokkos::DefaultExecutionSpace::memory_space;
 
-  Kokkos::View<double *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_face_area(&face_area[0], face_area.size());
-  Kokkos::View<const int *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
-  Kokkos::View<const int *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
-  Kokkos::View<const Vec3 *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_surz(&surz[0], surz.size());
-  Kokkos::View<int *, HOST_SPACE, Kokkos::MemoryTraits<Kokkos::Unmanaged>>  h_side_tag(&side_tag[0], side_tag.size());
+  Kokkos::View<double *, HOST_SPACE>  h_face_area(&face_area[0], face_area.size());
+  Kokkos::View<const int *, HOST_SPACE>  h_s_to_f_map(&s_to_f_map[0], s_to_f_map.size());
+  Kokkos::View<const int *, HOST_SPACE>  h_s_to_s2_map(&s_to_s2_map[0], s_to_s2_map.size());
+  Kokkos::View<const Vec3 *, HOST_SPACE>  h_surz(&surz[0], surz.size());
+  Kokkos::View<int *, HOST_SPACE>  h_side_tag(&side_tag[0], side_tag.size());
   Kokkos::View<const short *, HOST_SPACE>  h_side_type(&side_type[0], side_type.size());
   Kokkos::View<const int *, HOST_SPACE>  h_face_comm_type(&face_comm_type[0], face_comm_type.size());
 
