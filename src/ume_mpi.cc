@@ -127,8 +127,8 @@ int main(int argc, char *argv[]) {
   invert_time.stop();
 
   if (comm.pe() == 0) {
-    std::cout << "Original algorithm took: " << orig_time.seconds() << "s\n";
-    std::cout << "Inverted algorithm took: " << invert_time.seconds() << "s\n";
+    std::cout << "Original algorithm took: " << orig_time.seconds() << " s\n";
+    std::cout << "Inverted algorithm took: " << invert_time.seconds() << " s\n";
     std::cout << "Checking gradient result..." << std::endl;
   }
 
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
   face_time.stop();
 
   if (comm.pe() == 0)
-    std::cout << "Face area computation took: " << face_time.seconds() << "s\n";
+    std::cout << "Face area computation took: " << face_time.seconds() << " s\n";
 
   if (mesh.ivtag >= UME_VERSION_2) {
     if (comm.pe() == 0)
@@ -194,6 +194,7 @@ bool read_mesh(char const *const basename, int const mype, Mesh &mesh) {
   }
   mesh.read(is);
   is.close();
+  //mesh.print_stats(std::cout);
   return true;
 }
 
