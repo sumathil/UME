@@ -117,7 +117,6 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   Kokkos::Experimental::contribute(d_point_volume,s_point_volume);
   Kokkos::Experimental::contribute(d_point_gradient,s_point_gradient);
 
-
   Kokkos::fence();
   Kokkos::deep_copy(h_point_volume, d_point_volume);
   Kokkos::deep_copy(h_point_gradient, d_point_gradient);

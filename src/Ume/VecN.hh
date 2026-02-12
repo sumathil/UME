@@ -197,16 +197,14 @@ constexpr double vectormag(Vec3 const &a) {
 }
 
 } // namespace Ume
-/*namespace Kokkos {
-
+namespace Kokkos {
   template <>
   struct reduction_identity<Ume::Vec3> {
     KOKKOS_FORCEINLINE_FUNCTION
     static constexpr Ume::Vec3 sum() {
-      Ume::Vec3 zero;
-      for (int i=0;i<3;++i) zero.data_[i]=0.0;
-      return zero;
+      Ume::Vec3 v{};
+      return v;
     }
   };
-}*/
+}
 #endif
