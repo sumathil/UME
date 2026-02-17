@@ -44,6 +44,7 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   zone_gradient.assign(mesh.zones.size(), VEC3_T(0.0));
   
   #define HOST_SPACE Kokkos::HostSpace
+  using ExecSpace = Kokkos::DefaultExecutionSpace;
   using space_t = Kokkos::DefaultExecutionSpace::memory_space;
 
   Kokkos::View<Vec3 *, HOST_SPACE> h_point_gradient(&point_gradient[0], point_gradient.size());
@@ -89,13 +90,19 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   Kokkos::deep_copy(d_csurf, h_csurf);
   #endif
   
-  Kokkos::parallel_for("gradzatz-1-cuda", cl, KOKKOS_LAMBDA (const int c) {
-    if (d_corner_type[c] >= 1){  
+  Kokkos::parallel_for("gradzatz-1", cl, KOKKOS_LAMBDA (const int c) {
+    if (d_corner_type(c) >= 1){  
       // Only operate on interior corners
-      int const z = d_c_to_z_map[c];
-      int const p = d_c_to_p_map[c];
-      Kokkos::atomic_add(&d_point_volume[p],d_corner_volume[c]);
-      Kokkos::atomic_add(&d_point_gradient[p],d_csurf[c] * d_zone_field[z]);
+      int const z = d_c_to_z_map(c);
+      int const p = d_c_to_p_map(c);
+      if constexpr (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+        d_point_volume(p)+=d_corner_volume(c);
+        d_point_gradient(p)+=d_csurf(c) * d_zone_field(z);
+      }
+      else {
+        Kokkos::atomic_add(&d_point_volume(p),d_corner_volume(c));
+        Kokkos::atomic_add(&d_point_gradient(p),d_csurf(c) * d_zone_field(z));
+      }
     }
   });
 
@@ -113,15 +120,15 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
     perimeter of the mesh (POINT_TYPE=-1), subtract the outward normal component
     of the gradient using the point normals.
    */
-  Kokkos::parallel_for("gradzatz-2-cuda", pl, KOKKOS_LAMBDA (const int p) {
-  if (d_point_type[p] > 0) {
+  Kokkos::parallel_for("gradzatz-2", pl, KOKKOS_LAMBDA (const int p) {
+  if (d_point_type(p) > 0) {
       // Internal point
-      d_point_gradient[p] /= d_point_volume[p];
-    } else if (d_point_type[p] == -1) {
+      d_point_gradient(p) /= d_point_volume(p);
+    } else if (d_point_type(p) == -1) {
       // Mesh boundary point
-      double const ppdot = dotprod(d_point_gradient[p], d_point_normal[p]);
-      d_point_gradient[p] =
-          (d_point_gradient[p] - d_point_normal[p] * ppdot) / d_point_volume[p];
+      double const ppdot = dotprod(d_point_gradient(p), d_point_normal(p));
+      d_point_gradient(p) =
+          (d_point_gradient(p) - d_point_normal(p) * ppdot) / d_point_volume(p);
     }
   });
 
@@ -134,22 +141,32 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
 
   /* Accumulate the zone volume.  Note that we need to allocate a zone field for
      volume, as we are accumulating from corners */
-  Kokkos::parallel_for("gradzatz-1-cuda", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
-    if (d_corner_type[corner_idx] >= 1){ 
+  Kokkos::parallel_for("gradzatz-3", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
+    if (d_corner_type(corner_idx) >= 1){ 
     // Only operate on interior corners
-      int const zone_idx = d_c_to_z_map[corner_idx];
-      Kokkos::atomic_add(&d_zone_volume[zone_idx],d_corner_volume[corner_idx]);
+      int const zone_idx = d_c_to_z_map(corner_idx);
+      if constexpr (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+        d_zone_volume(zone_idx) += d_corner_volume(corner_idx);
+      }
+      else {
+        Kokkos::atomic_add(&d_zone_volume(zone_idx),d_corner_volume(corner_idx));
+      }
     }
   });
 
   // Accumulate the zone-centered gradient
-  Kokkos::parallel_for("gradzatz-2-cuda", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
-    if (d_corner_type[corner_idx] >= 1)
+  Kokkos::parallel_for("gradzatz-4", num_local_corners, KOKKOS_LAMBDA (const int corner_idx) {
+    if (d_corner_type(corner_idx) >= 1)
     { //  continue; // Only operate on interior corners
-      int const zone_idx = d_c_to_z_map[corner_idx];
-      int const point_idx = d_c_to_p_map[corner_idx];
-      double const c_z_vol_ratio = d_corner_volume[corner_idx] / d_zone_volume[zone_idx];
-      Kokkos::atomic_add(&d_zone_gradient[zone_idx],d_point_gradient[point_idx] * c_z_vol_ratio);
+      int const zone_idx = d_c_to_z_map(corner_idx);
+      int const point_idx = d_c_to_p_map(corner_idx);
+      double const c_z_vol_ratio = d_corner_volume(corner_idx) / d_zone_volume(zone_idx);
+      if constexpr (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+        d_zone_gradient(zone_idx)+=d_point_gradient(point_idx) * c_z_vol_ratio;
+      }
+      else {
+        Kokkos::atomic_add(&d_zone_gradient(zone_idx),d_point_gradient(point_idx) * c_z_vol_ratio);
+      }
     }
    });
 
@@ -190,9 +207,9 @@ void gradzatp_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
 
   Kokkos::parallel_for("gradzatp-ivt", Kokkos::RangePolicy<Execspace>(0,num_local_points), [&] (const int point_idx) {
       for (int const &corner_idx : p_to_c_map[point_idx]) {
-        int const zone_idx = h_c_to_z_map[corner_idx];
-        h_point_volume[point_idx] += h_corner_volume[corner_idx];
-        h_point_gradient[point_idx] += h_csurf[corner_idx] * h_zone_field[zone_idx];
+        int const zone_idx = h_c_to_z_map(corner_idx);
+        h_point_volume(point_idx) += h_corner_volume(corner_idx);
+        h_point_gradient(point_idx) += h_csurf(corner_idx) * h_zone_field(zone_idx);
       }
     });
 
@@ -201,15 +218,15 @@ void gradzatp_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   mesh.points.gathscat(Ume::Comm::Op::SUM, point_gradient);
 
   Kokkos::parallel_for("gradzatp-ivt-2", Kokkos::RangePolicy<Execspace>(0,num_local_points), [&] (const int point_idx) {
-    if (h_point_type[point_idx] > 0) {
+    if (h_point_type(point_idx) > 0) {
       // Internal point
-      h_point_gradient[point_idx] =h_point_gradient[point_idx]/ h_point_volume[point_idx];
-    } else if (h_point_type[point_idx] == -1) {
+      h_point_gradient(point_idx) =h_point_gradient(point_idx)/ h_point_volume(point_idx);
+    } else if (h_point_type(point_idx) == -1) {
       // Mesh boundary point
       double const ppdot =
-          dotprod(h_point_gradient[point_idx], h_point_normal[point_idx]);
-      h_point_gradient[point_idx] = (h_point_gradient[point_idx] - h_point_normal[point_idx] * ppdot) /
-          h_point_volume[point_idx];
+          dotprod(h_point_gradient(point_idx), h_point_normal(point_idx));
+      h_point_gradient(point_idx) = (h_point_gradient(point_idx) - h_point_normal(point_idx) * ppdot) /
+          h_point_volume(point_idx);
     }
   });
 
@@ -238,18 +255,18 @@ void gradzatz_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   Kokkos::View<Vec3 *, KOKKOS_SPACE> h_point_gradient(&point_gradient[0], point_gradient.size());
 
   Kokkos::parallel_for("gradzatz-ivt-1", Kokkos::RangePolicy<Execspace>(0,num_local_zones), [&] (const int zone_idx) {
-      if (h_zone_type[zone_idx] >= 1){
+      if (h_zone_type(zone_idx) >= 1){
         // Only operate on local interior zones
         // Accumulate the (local) zone volume
         double zone_volume{0.0}; // Only need a local volume
         for (int const &corner_idx : z_to_c_map[zone_idx]) {
-          zone_volume += h_corner_volume[corner_idx];
+          zone_volume += h_corner_volume(corner_idx);
         }
 
         for (int const &corner_idx : z_to_c_map[zone_idx]) {
-          int const point_idx = h_c_to_p_map[corner_idx];
-          double const c_z_vol_ratio = h_corner_volume[corner_idx] / zone_volume;
-          h_zone_gradient[zone_idx] += h_point_gradient[point_idx] * c_z_vol_ratio;
+          int const point_idx = h_c_to_p_map(corner_idx);
+          double const c_z_vol_ratio = h_corner_volume(corner_idx) / zone_volume;
+          h_zone_gradient(zone_idx) += h_point_gradient(point_idx) * c_z_vol_ratio;
         }
       }
   });
