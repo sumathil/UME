@@ -95,7 +95,7 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
       // Only operate on interior corners
       int const z = d_c_to_z_map(c);
       int const p = d_c_to_p_map(c);
-      if constexpr (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+      if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
         d_point_volume(p)+=d_corner_volume(c);
         d_point_gradient(p)+=d_csurf(c) * d_zone_field(z);
       }
@@ -145,7 +145,7 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
     if (d_corner_type(corner_idx) >= 1){ 
     // Only operate on interior corners
       int const zone_idx = d_c_to_z_map(corner_idx);
-      if constexpr (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+      if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
         d_zone_volume(zone_idx) += d_corner_volume(corner_idx);
       }
       else {
@@ -161,7 +161,7 @@ void gradzatz(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
       int const zone_idx = d_c_to_z_map(corner_idx);
       int const point_idx = d_c_to_p_map(corner_idx);
       double const c_z_vol_ratio = d_corner_volume(corner_idx) / d_zone_volume(zone_idx);
-      if constexpr (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+      if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
         d_zone_gradient(zone_idx)+=d_point_gradient(point_idx) * c_z_vol_ratio;
       }
       else {
