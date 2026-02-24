@@ -16,7 +16,6 @@
 #include "Ume/SOA_Idx_Mesh.hh"
 #include "Ume/soa_idx_helpers.hh"
 #include <cassert>
-#include <iostream>
 
 namespace Ume {
 namespace SOA_Idx {
