@@ -13,13 +13,8 @@
   \file Ume/face_area.cc
 */
 
-#ifdef USE_CALI
-#include <caliper/cali-manager.h>
-#include <caliper/cali.h>
-#endif
-
 #include "Ume/face_area.hh"
-#include <Kokkos_Core.hpp>
+
 namespace Ume {
 
 using Mesh = SOA_Idx::Mesh;
