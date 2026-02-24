@@ -120,29 +120,7 @@ bool Sides::VAR_side_surf::init_() const {
   auto const &smask{sides().mask};
   auto &side_surf = mydata_vec3v();
   side_surf.assign(sll, VEC3_T(0.0));
- 
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s] > 0) {
-      // A real side in the interior of the mesh
-      Vec3 const &zc = zx[s2z[s]];
-      Vec3 const &ep = ex[s2e[s]];
-      Vec3 const &fp = fx[s2f[s]];
-      // Area-weighted normal of triangle <ep, fp, zc>.  The corners that
-      // intersect this side share a face in the plane of that triangle. 
-      side_surf[s] = crossprod(ep - zc, fp - zc) / 2.0;
-    } else if (smask[s] < 0) {
-      // A ghost side on a mesh boundary face.  There isn't really a zx here, so
-      //   we compute it differently 
-      Vec3 const &fc = fx[s2f[s]];
-      Vec3 const &p1 = px[s2p1[s]];
-      Vec3 const &p2 = px[s2p2[s]];
-      side_surf[s] = crossprod(p1 - fc, p2 - fc) / 4.0; // Deliberate
-    } else{
-      side_surf[s] = 0.0;
-    }
-  }
-*/
-  
+
   using Execspace = Kokkos::HostSpace::execution_space;
     
   Kokkos::View<Vec3 *, Kokkos::HostSpace>  h_side_surf(&side_surf[0], sl);
@@ -158,24 +136,24 @@ bool Sides::VAR_side_surf::init_() const {
   Kokkos::View<const short *, Kokkos::HostSpace>  h_smask(&smask[0], smask.size());
 
   Kokkos::parallel_for("VAR_side_surf", Kokkos::RangePolicy<Execspace>(0, sl), [&] (const int s) {
-      if (h_smask[s] > 0) {
+      if (h_smask(s) > 0) {
       // A real side in the interior of the mesh
-      Vec3 const &zc = h_zx[h_s2z[s]];
-      Vec3 const &ep = h_ex[h_s2e[s]];
-      Vec3 const &fp = h_fx[h_s2f[s]];  
+      Vec3 const &zc = h_zx(h_s2z(s));
+      Vec3 const &ep = h_ex(h_s2e(s));
+      Vec3 const &fp = h_fx(h_s2f(s));  
    //    Area-weighted normal of triangle <ep, fp, zc>.  The corners that
       //   intersect this side share a face in the plane of that triangle. 
       //auto tmp = 
-      h_side_surf[s] = crossprod(ep - zc, fp - zc) / 2.0;
-    } else if (h_smask[s] < 0) {
+      h_side_surf(s) = crossprod(ep - zc, fp - zc) / 2.0;
+    } else if (h_smask(s) < 0) {
       /* A ghost side on a mesh boundary face.  There isn't really a zx here, so
          we compute it differently */
-      Vec3 const &fc = h_fx[h_s2f[s]];
-      Vec3 const &p1 = h_px[h_s2p1[s]];
-      Vec3 const &p2 = h_px[h_s2p2[s]];
-      h_side_surf[s] = crossprod(p1 - fc, p2 - fc) / 4.0; // Deliberate
+      Vec3 const &fc = h_fx(h_s2f(s));
+      Vec3 const &p1 = h_px(h_s2p1(s));
+      Vec3 const &p2 = h_px(h_s2p2(s));
+      h_side_surf(s) = crossprod(p1 - fc, p2 - fc) / 4.0; // Deliberate
     } else
-      h_side_surf[s] = 0.0;
+      h_side_surf(s) = 0.0;
 
    });
 
@@ -199,20 +177,6 @@ bool Sides::VAR_side_surz::init_() const {
   auto &side_surz = mydata_vec3v();
   side_surz.assign(sll, VEC3_T(0.0)); // 
 
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s]) {
-      // A non-ghost side
-      Vec3 const &fc = fx[s2f[s]]; // 0
-      Vec3 const &p1 = px[s2p1[s]]; // 2
-      Vec3 const &p2 = px[s2p2[s]]; // 1
-      // Area-weighted normal of triangle <p2, p1, fc>
-      side_surz[s] = crossprod(p2 - fc, p1 - fc) / 2.0;
-    } else
-    {
-      side_surz[s] = 0.0;
-    }
-  }*/
-
   using Execspace = Kokkos::HostSpace::execution_space;
 
   Kokkos::View<Vec3 *, Kokkos::HostSpace>  h_side_surz_k(&side_surz[0], sl);
@@ -221,18 +185,18 @@ bool Sides::VAR_side_surz::init_() const {
   Kokkos::View<const int *, Kokkos::HostSpace>  h_s2p1(&s2p1[0], sl);
   Kokkos::View<const int *, Kokkos::HostSpace>  h_s2p2(&s2p2[0], sl);
   Kokkos::View<const int *, Kokkos::HostSpace>  h_s2f(&s2f[0], sl); 
-  
+  Kokkos::View<const short *, Kokkos::HostSpace>  h_smask(&smask[0], smask.size());
 
   Kokkos::parallel_for("VAR_side_surz", Kokkos::RangePolicy<Execspace>(0, sl), [&] (const int s) {
-      if (smask[s]) {
+      if (h_smask(s)) {
       // A non-ghost side
-      Vec3 const &fc = h_fx[h_s2f[s]]; // 0
-      Vec3 const &p1 = h_px[h_s2p1[s]]; // 2
-      Vec3 const &p2 = h_px[h_s2p2[s]]; // 1
+      Vec3 const &fc = h_fx(h_s2f(s)); // 0
+      Vec3 const &p1 = h_px(h_s2p1(s)); // 2
+      Vec3 const &p2 = h_px(h_s2p2(s)); // 1
       // Area-weighted normal of triangle <p2, p1, fc>
-      h_side_surz_k[s] = crossprod(p2 - fc, p1 - fc) / 2.0;
+      h_side_surz_k(s) = crossprod(p2 - fc, p1 - fc) / 2.0;
     } else{
-      h_side_surz_k[s] = 0.0;
+      h_side_surz_k(s) = 0.0;
     }
    });
 
@@ -255,24 +219,6 @@ bool Sides::VAR_side_vol::init_() const {
   auto &side_vol = mydata_dblv();
   side_vol.assign(sll, 0.0);
   
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s] > 0) {
-      Vec3 const &zc = zx[s2z[s]];
-      Vec3 const &p1 = px[s2p1[s]];
-      Vec3 const &p2 = px[s2p2[s]];
-      Vec3 const &fc = fx[s2f[s]];
-      /* Note that this is a signed volume of the tetrahedron formed by the zone
-         center, face center, and edge endpoints. */
-      /*auto const fz = fc - zc;
-      auto const p1z = p1 - zc;
-      auto const p2z = p2 - zc;
-      auto const cp = crossprod(p2z, p1z);
-
-      side_vol[s] = dotprod(fz, cp) / 6.0;
-    } else
-      side_vol[s] = 0.0;
-  }*/
-
   Kokkos::View<double *, Kokkos::HostSpace>  h_side_vol_k(&side_vol[0], sl);
   Kokkos::View<const Vec3 *, Kokkos::HostSpace>  h_px(&px[0], px.size());
   Kokkos::View<const Vec3 *, Kokkos::HostSpace>  h_zx(&zx[0], zx.size());
@@ -286,20 +232,20 @@ bool Sides::VAR_side_vol::init_() const {
   using Execspace = Kokkos::HostSpace::execution_space;
 
   Kokkos::parallel_for("VAR_side_vol", Kokkos::RangePolicy<Execspace>(0, sl), [&] (const int s) {
-    if (h_smask[s] > 0) {
-      Vec3 const &zc = h_zx[h_s2z[s]];
-      Vec3 const &p1 = h_px[h_s2p1[s]];
-      Vec3 const &p2 = h_px[h_s2p2[s]];
-      Vec3 const &fc = h_fx[h_s2f[s]];
+    if (h_smask(s) > 0) {
+      Vec3 const &zc = h_zx(h_s2z(s));
+      Vec3 const &p1 = h_px(h_s2p1(s));
+      Vec3 const &p2 = h_px(h_s2p2(s));
+      Vec3 const &fc = h_fx(h_s2f(s));
       /* Note that this is a signed volume of the tetrahedron formed by the zone
          center, face center, and edge endpoints. */
       auto const fz = fc - zc;
       auto const p1z = p1 - zc;
       auto const p2z = p2 - zc;
       auto const cp = crossprod(p2z, p1z);
-      h_side_vol_k[s] = dotprod(fz, cp) / 6.0;
+      h_side_vol_k(s) = dotprod(fz, cp) / 6.0;
     } else
-      h_side_vol_k[s] = 0.0;
+      h_side_vol_k(s) = 0.0;
   });
 
   sides().scatter(side_vol);

@@ -105,40 +105,25 @@ bool Points::VAR_point_norm::init_() const {
   Kokkos::View<const short *, Kokkos::HostSpace>  h_pmask(&pmask[0], pmask.size());
 
   Kokkos::parallel_for("Var_point_norm", Kokkos::RangePolicy<Execspace>(0, sl), [&] (const int s) {
-  if (h_smask[s] == -1) { // boundary side (outside of real mesh)
-      int const s2 = h_s2s2[s]; // the corresponding real side
-      int const p1 = h_s2p1[s2];
-      int const p2 = h_s2p2[s2];
-      h_point_norm_k[p1] += h_side_surz[s2];
-      h_point_norm_k[p2] += h_side_surz[s2];
+  if (h_smask(s) == -1) { // boundary side (outside of real mesh)
+      int const s2 = h_s2s2(s); // the corresponding real side
+      int const p1 = h_s2p1(s2);
+      int const p2 = h_s2p2(s2);
+      h_point_norm_k(p1) += h_side_surz(s2);
+      h_point_norm_k(p2) += h_side_surz(s2);
     }
   });
-
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s] == -1) { // boundary side (outside of real mesh)
-      int const s2 = s2s2[s]; // the corresponding real side
-      int const p1 = s2p1[s2];
-      int const p2 = s2p2[s2];
-      point_norm[p1] += side_surz[s2];
-      point_norm[p2] += side_surz[s2];
-    }
-  }*/
-
+  
   /* Since points are shared among adjacent parallel ranks, we need to do a
      parallel sum. */
   points().gathscat(Comm::Op::SUM, point_norm);
 
   Kokkos::parallel_for("normalize_point_norm", Kokkos::RangePolicy<Execspace>(0, pl), [&] (const int p) {
-    if (h_pmask[p] < 0) {
-         normalize(h_point_norm_k[p]);
+    if (h_pmask(p) < 0) {
+         normalize(h_point_norm_k(p));
     }
   });
 
-  /*for (int p = 0; p < pl; ++p) {
-    if (pmask[p] < 0) {
-      normalize(point_norm[p]);
-    }
-  }*/  
   VAR_INIT_EPILOGUE;
 }
 

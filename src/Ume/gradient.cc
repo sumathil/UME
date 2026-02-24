@@ -205,7 +205,7 @@ void gradzatp_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   Kokkos::View<const Vec3 *, KOKKOS_SPACE>  h_point_normal(&point_normal[0], point_normal.size());
   Kokkos::View<const short *, KOKKOS_SPACE>  h_point_type(&point_type[0], point_type.size());
 
-  Kokkos::parallel_for("gradzatp-ivt", Kokkos::RangePolicy<Execspace>(0,num_local_points), [&] (const int point_idx) {
+  Kokkos::parallel_for("gradzatp-ivt-1", Kokkos::RangePolicy<Execspace>(0,num_local_points), [&] (const int point_idx) {
       for (int const &corner_idx : p_to_c_map[point_idx]) {
         int const zone_idx = h_c_to_z_map(corner_idx);
         h_point_volume(point_idx) += h_corner_volume(corner_idx);
@@ -254,7 +254,7 @@ void gradzatz_invert(Ume::SOA_Idx::Mesh &mesh, DBLV_T const &zone_field,
   Kokkos::View<Vec3 *, KOKKOS_SPACE> h_zone_gradient(&zone_gradient[0], zone_gradient.size());
   Kokkos::View<Vec3 *, KOKKOS_SPACE> h_point_gradient(&point_gradient[0], point_gradient.size());
 
-  Kokkos::parallel_for("gradzatz-ivt-1", Kokkos::RangePolicy<Execspace>(0,num_local_zones), [&] (const int zone_idx) {
+  Kokkos::parallel_for("gradzatz-ivt", Kokkos::RangePolicy<Execspace>(0,num_local_zones), [&] (const int zone_idx) {
       if (h_zone_type(zone_idx) >= 1){
         // Only operate on local interior zones
         // Accumulate the (local) zone volume

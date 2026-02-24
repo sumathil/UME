@@ -80,35 +80,21 @@ bool Faces::VAR_fcoord::init_() const {
   
   using Execspace = Kokkos::HostSpace::execution_space;
 
-  Kokkos::parallel_for("VAR_fcoord", Kokkos::RangePolicy<Execspace>(0, sl),[&] (const int s) {
-    if (h_smask[s]) {
-      int const f = h_s2f[s];
-      h_fcoord[f] += h_pcoord[h_s2p1[s]];
+  Kokkos::parallel_for("VAR_fcoord-1", Kokkos::RangePolicy<Execspace>(0, sl),[&] (const int s) {
+    if (h_smask(s)) {
+      int const f = h_s2f(s);
+      h_fcoord(f) += h_pcoord(h_s2p1(s));
       h_num_face_pts.access(f) += 1;
     }
   });
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s]) {
-      int const f = s2f[s];
-      fcoord[f] += pcoord[s2p1[s]];
-      h_num_face_pts.at(f) += 1;
-    }
-  }*/
-
   auto const &fmask{faces().mask};
   
   Kokkos::View<const short *, Kokkos::HostSpace>  h_fmask(&fmask[0], fmask.size());
-  Kokkos::parallel_for("VAR_fcoord-1", Kokkos::RangePolicy<Execspace>(0, fl),[&] (const int f) {
-    if (h_fmask[f]) {
-      h_fcoord[f] /= static_cast<double>(h_num_face_pts[f]);
+  Kokkos::parallel_for("VAR_fcoord-2", Kokkos::RangePolicy<Execspace>(0, fl),[&] (const int f) {
+    if (h_fmask(f)) {
+      h_fcoord(f) /= static_cast<double>(h_num_face_pts(f));
     }
   });
-
-  /*for (int f = 0; f < fl; ++f) {
-    if (fmask[f]) {
-      fcoord[f] /= static_cast<double>(num_face_pts[f]);
-    }
-  }*/
 
   VAR_INIT_EPILOGUE;
 }

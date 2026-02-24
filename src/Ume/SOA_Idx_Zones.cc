@@ -75,37 +75,24 @@ bool Zones::VAR_zcoord::init_() const {
   
   using Execspace = Kokkos::HostSpace::execution_space;
 
-  Kokkos::parallel_for("VAR_zcoord", Kokkos::RangePolicy<Execspace>(0, cl),[&] (const int c) {
-    if (h_cmask[c]) {
-      int const z = h_c2z[c];
-      h_zcoord[z] += h_pcoord[h_c2p[c]];
+  Kokkos::parallel_for("VAR_zcoord-1", Kokkos::RangePolicy<Execspace>(0, cl),[&] (const int c) {
+    if (h_cmask(c)) {
+      int const z = h_c2z(c);
+      h_zcoord(z) += h_pcoord(h_c2p(c));
       h_num_zone_pts.access(z) += 1;
     }
   });
-
-  /*for (int c = 0; c < cl; ++c) {
-    if (cmask[c]) {
-      int const z = c2z[c];
-      zcoord[z] += pcoord[c2p[c]];
-      num_zone_pts.at(z) += 1;
-    }
-  }*/
 
   auto const &zmask{zones().mask};
 
   Kokkos::View<const short *, Kokkos::HostSpace>  h_zmask(&zmask[0], zmask.size());
   
-  Kokkos::parallel_for("VAR_zcoord-1", Kokkos::RangePolicy<Execspace>(0, zl),[&] (const int z) {
-    if (h_zmask[z]) {
-      h_zcoord[z] /= static_cast<double>(h_num_zone_pts[z]);
+  Kokkos::parallel_for("VAR_zcoord-2", Kokkos::RangePolicy<Execspace>(0, zl),[&] (const int z) {
+    if (h_zmask(z)) {
+      h_zcoord(z) /= static_cast<double>(h_num_zone_pts(z));
     }
   });
 
-  /*for (int z = 0; z < zl; ++z) {
-    if (zmask[z]) {
-      zcoord[z] /= static_cast<double>(num_zone_pts[z]);
-    }
-  }*/
   zones().scatter(zcoord);
   VAR_INIT_EPILOGUE;
 }

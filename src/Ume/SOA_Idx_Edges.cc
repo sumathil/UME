@@ -77,20 +77,12 @@ bool Edges::VAR_ecoord::init_() const {
   Kokkos::View<const int *, Kokkos::HostSpace>  h_e2p1(e2p1.data(), e2p1.size());
   
   Kokkos::parallel_for("VAR_ecoord", Kokkos::RangePolicy<Execspace>(0, el),[&] (const int e) {
-      if (h_emask[e]) {
-      h_ecoord[e] = (h_pcoord[h_e2p1[e]] + h_pcoord[h_e2p2[e]]) * 0.5;
+      if (h_emask(e)) {
+      h_ecoord(e) = (h_pcoord(h_e2p1(e)) + h_pcoord(h_e2p2(e))) * 0.5;
     } else{
-      h_ecoord[e] =0.0;
+      h_ecoord(e) =0.0;
     }
    });
-
-  /*for (int e = 0; e < el; ++e) {
-    if (emask[e]) {
-      ecoord[e] = (pcoord[e2p1[e]] + pcoord[e2p2[e]]) * 0.5;
-    } else {
-      ecoord[e] = 0.0;
-    }
-  }*/
 
   VAR_INIT_EPILOGUE;
 }

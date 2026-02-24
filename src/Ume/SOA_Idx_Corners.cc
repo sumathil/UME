@@ -78,20 +78,13 @@ bool Corners::VAR_corner_vol::init_() const {
 
 
   Kokkos::parallel_for("VAR_corner_vol", Kokkos::RangePolicy<Execspace>(0, sl), [&] (const int s) {
-    if (h_smask[s] > 0) {
-      double const hsv = 0.5 * h_side_vol[s];
-      h_corner_vol[h_s2c1[s]] += hsv;
-      h_corner_vol[h_s2c2[s]] += hsv;
+    if (h_smask(s) > 0) {
+      double const hsv = 0.5 * h_side_vol(s);
+      h_corner_vol(h_s2c1(s)) += hsv;
+      h_corner_vol(h_s2c2(s)) += hsv;
     }    
   });
 
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s] > 0) {
-      double const hsv = 0.5 * side_vol[s];
-      corner_vol[s2c1[s]] += hsv;
-      corner_vol[s2c2[s]] += hsv;
-    }
-  }*/
   corners().scatter(corner_vol);
   VAR_INIT_EPILOGUE;
 }
@@ -116,18 +109,12 @@ bool Corners::VAR_corner_csurf::init_() const {
   Kokkos::View<const short *, Kokkos::HostSpace>  h_smask(&smask[0], smask.size());
   
   Kokkos::parallel_for("VAR_corner_csurf", Kokkos::RangePolicy<Execspace>(0, sl), [&] (const int s) {
-    if (h_smask[s]) {
-      h_corner_csurf[h_s2c1[s]] += h_side_surf[s];
-      h_corner_csurf[h_s2c2[s]] -= h_side_surf[s];
+    if (h_smask(s)) {
+      h_corner_csurf(h_s2c1(s)) += h_side_surf(s);
+      h_corner_csurf(h_s2c2(s)) -= h_side_surf(s);
     }
   });
    
-  /*for (int s = 0; s < sl; ++s) {
-    if (smask[s]) {
-      corner_csurf[s2c1[s]] += side_surf[s];
-      corner_csurf[s2c2[s]] -= side_surf[s];
-    }
-  }*/
   VAR_INIT_EPILOGUE;
 }
 
