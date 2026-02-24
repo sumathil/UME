@@ -56,6 +56,12 @@ flag. Package-specific CMake options for UME include:
 * `USE_OPENACC=YES` will enable OpenACC support, and requires the
   C++ compiler to support it (UME does not currently use OpenACC).
 
+### Build command
+
+```
+% cmake -B <build_dir> -DUSE_KOKKOS=ON -DUSE_MPI=ON -DCMAKE_BUILD_TYPE=Release
+% cmake --build <build_dir> -j 8      (equivalent to cd <build_dir> && make -j 8)
+```
 
 ### Generated Executables
 
