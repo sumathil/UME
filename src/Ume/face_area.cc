@@ -36,6 +36,7 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
   INTV_T side_tag(sll, 0);
 
   #define HOST_SPACE Kokkos::HostSpace
+  using ExecSpace = Kokkos::DefaultExecutionSpace;
   using space_t = Kokkos::DefaultExecutionSpace::memory_space;
 
   Kokkos::View<double *, HOST_SPACE>  h_face_area(&face_area[0], face_area.size());
@@ -70,8 +71,13 @@ void calc_face_area(Mesh &mesh, DBLV_T &face_area) {
         int const f = d_s_to_f_map(s);
         if (d_face_comm_type(f) < 3) { // Internal or master face
           double const side_area = vectormag(d_surz(s)); // Flat area
-          d_face_area(f) += side_area;
-
+          if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+            d_face_area(f) += side_area;
+          }
+          else 
+          {
+            Kokkos::atomic_add(&d_face_area(f),side_area);
+          }
           int const s2 = d_s_to_s2_map(s);
           d_side_tag(s2) = 1;
         }

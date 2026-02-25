@@ -4,9 +4,8 @@ option(USE_KOKKOS "Enable support for Kokkos code")
 if(USE_KOKKOS)
 
   find_package(Kokkos REQUIRED)
-  find_package(MPI REQUIRED)
 
-  set(COMMON_LINK_LIBRARIES MPI::MPI_CXX Kokkos::kokkos)
+  set(COMMON_LINK_LIBRARIES Kokkos::kokkos)
   # Link CUDART for CUDA backend
   if(Kokkos_ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
@@ -16,6 +15,5 @@ if(USE_KOKKOS)
   
   set(COMMON_COMPILE_DEFINITIONS
     ${COMMON_COMPILE_DEFINITIONS}
-    HAVE_MPI
     )
 endif()
