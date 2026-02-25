@@ -25,12 +25,13 @@ set_target_properties(scale_mesh PROPERTIES
 # Things that depend on MPI
 #############################################################################
 if(USE_MPI)
-add_executable(ume_mpi ume_mpi.cc)
-target_link_libraries(ume_mpi Ume)
-set_target_properties(ume_mpi PROPERTIES
-  COMPILE_DEFINITIONS "${COMMON_COMPILE_DEFINITIONS}"
-  COMPILE_OPTIONS "${WARNING_FLAGS}"
-  )
+
+  add_executable(ume_mpi ume_mpi.cc)
+  target_link_libraries(ume_mpi Ume)
+  set_target_properties(ume_mpi PROPERTIES
+    COMPILE_DEFINITIONS "${COMMON_COMPILE_DEFINITIONS}"
+    COMPILE_OPTIONS "${WARNING_FLAGS}"
+    )
 endif()
 
 

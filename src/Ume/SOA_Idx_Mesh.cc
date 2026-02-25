@@ -60,16 +60,16 @@ void Mesh::write(std::ostream &os) const {
 
 void Mesh::read(std::istream &is) {
   read_bin(is, ivtag);
-  
+
   // Handle the case when the only an old binary ume file is available:
   //
   // The ume binary was created before a heading existed in the umetxt
   // and the original umetxt is no longer available.
-  // 
+  //
   // Therefore, trying to read the version gives you mype since
   // no version information exists
   //
-  // An alternative solution is to have a script to modify these 
+  // An alternative solution is to have a script to modify these
   // original binary ume files
   if (ivtag != UME_VERSION_1 && ivtag != UME_VERSION_2) {
     mype = ivtag;
@@ -77,8 +77,7 @@ void Mesh::read(std::istream &is) {
     dump_iotas = false;
     version_header = false;
     std::cout << "No Version Header" << std::endl;
-  }
-  else {
+  } else {
     read_bin(is, mype);
     version_header = true;
   }
