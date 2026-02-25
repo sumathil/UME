@@ -68,28 +68,30 @@ bool Corners::VAR_corner_vol::init_() const {
   auto const &smask{sides().mask};
   auto &corner_vol = mydata_dblv();
   corner_vol.assign(cll, 0.0);
-  
+
   using ExecSpace = Kokkos::HostSpace::execution_space;
-  Kokkos::View<const int *, Kokkos::HostSpace>  h_s2c1(s2c1.data(), s2c1.size());
-  Kokkos::View<const int *, Kokkos::HostSpace>  h_s2c2( s2c2.data(), s2c2.size());
-  Kokkos::View<const short *, Kokkos::HostSpace>  h_smask(&smask[0], smask.size());
-  Kokkos::View<double *, Kokkos::HostSpace>  h_corner_vol(&corner_vol[0], corner_vol.size());
-  Kokkos::View<const double *, Kokkos::HostSpace>  h_side_vol(&side_vol[0], side_vol.size());
+  Kokkos::View<const int *, Kokkos::HostSpace> h_s2c1(s2c1.data(), s2c1.size());
+  Kokkos::View<const int *, Kokkos::HostSpace> h_s2c2(s2c2.data(), s2c2.size());
+  Kokkos::View<const short *, Kokkos::HostSpace> h_smask(
+      &smask[0], smask.size());
+  Kokkos::View<double *, Kokkos::HostSpace> h_corner_vol(
+      &corner_vol[0], corner_vol.size());
+  Kokkos::View<const double *, Kokkos::HostSpace> h_side_vol(
+      &side_vol[0], side_vol.size());
 
-
-  Kokkos::parallel_for("VAR_corner_vol", Kokkos::RangePolicy<ExecSpace>(0, sl), [&] (const int s) {
-    if (h_smask(s) > 0) {
-      double const hsv = 0.5 * h_side_vol(s);
-      if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
-        h_corner_vol(h_s2c1(s)) += hsv;
-        h_corner_vol(h_s2c2(s)) += hsv;
-      }
-      else {
-        Kokkos::atomic_add(&h_corner_vol(h_s2c1(s)),hsv);
-        Kokkos::atomic_add(&h_corner_vol(h_s2c2(s)),hsv);
-      }
-    }    
-  });
+  Kokkos::parallel_for("VAR_corner_vol", Kokkos::RangePolicy<ExecSpace>(0, sl),
+      [&](const int s) {
+        if (h_smask(s) > 0) {
+          double const hsv = 0.5 * h_side_vol(s);
+          if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+            h_corner_vol(h_s2c1(s)) += hsv;
+            h_corner_vol(h_s2c2(s)) += hsv;
+          } else {
+            Kokkos::atomic_add(&h_corner_vol(h_s2c1(s)), hsv);
+            Kokkos::atomic_add(&h_corner_vol(h_s2c2(s)), hsv);
+          }
+        }
+      });
 
   corners().scatter(corner_vol);
   VAR_INIT_EPILOGUE;
@@ -108,26 +110,27 @@ bool Corners::VAR_corner_csurf::init_() const {
   corner_csurf.assign(cll, Vec3(0.0));
 
   using ExecSpace = Kokkos::HostSpace::execution_space;
-  Kokkos::View<Vec3 *, Kokkos::HostSpace>  h_corner_csurf(&corner_csurf[0], sl);
-  Kokkos::View<const Vec3 *, Kokkos::HostSpace>  h_side_surf(&side_surf[0], side_surf.size());
-  Kokkos::View<const int *, Kokkos::HostSpace>  h_s2c1(s2c1.data(), s2c1.size());
-  Kokkos::View<const int *, Kokkos::HostSpace>  h_s2c2( s2c2.data(), s2c2.size());
-  Kokkos::View<const short *, Kokkos::HostSpace>  h_smask(&smask[0], smask.size());
-  
-  Kokkos::parallel_for("VAR_corner_csurf", Kokkos::RangePolicy<ExecSpace>(0, sl), [&] (const int s) {
-    if (h_smask(s)) {
-      if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
-        h_corner_csurf(h_s2c1(s)) += h_side_surf(s);
-        h_corner_csurf(h_s2c2(s)) -= h_side_surf(s);
-      }
-      else
-      {
-        Kokkos::atomic_add(&h_corner_csurf(h_s2c1(s)),h_side_surf(s));
-        Kokkos::atomic_sub(&h_corner_csurf(h_s2c2(s)),h_side_surf(s));
-      }
-    }
-  });
-   
+  Kokkos::View<Vec3 *, Kokkos::HostSpace> h_corner_csurf(&corner_csurf[0], sl);
+  Kokkos::View<const Vec3 *, Kokkos::HostSpace> h_side_surf(
+      &side_surf[0], side_surf.size());
+  Kokkos::View<const int *, Kokkos::HostSpace> h_s2c1(s2c1.data(), s2c1.size());
+  Kokkos::View<const int *, Kokkos::HostSpace> h_s2c2(s2c2.data(), s2c2.size());
+  Kokkos::View<const short *, Kokkos::HostSpace> h_smask(
+      &smask[0], smask.size());
+
+  Kokkos::parallel_for("VAR_corner_csurf",
+      Kokkos::RangePolicy<ExecSpace>(0, sl), [&](const int s) {
+        if (h_smask(s)) {
+          if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+            h_corner_csurf(h_s2c1(s)) += h_side_surf(s);
+            h_corner_csurf(h_s2c2(s)) -= h_side_surf(s);
+          } else {
+            Kokkos::atomic_add(&h_corner_csurf(h_s2c1(s)), h_side_surf(s));
+            Kokkos::atomic_sub(&h_corner_csurf(h_s2c2(s)), h_side_surf(s));
+          }
+        }
+      });
+
   VAR_INIT_EPILOGUE;
 }
 

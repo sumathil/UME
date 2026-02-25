@@ -64,39 +64,43 @@ bool Zones::VAR_zcoord::init_() const {
   zcoord.resize(zll, Vec3(0.0));
 
   std::vector<int> num_zone_pts(zl, 0);
-  
-  Kokkos::View<Vec3 *, Kokkos::HostSpace>  h_zcoord(&zcoord[0], zcoord.size());
-  Kokkos::View<const Vec3 *, Kokkos::HostSpace>  h_pcoord(&pcoord[0], pcoord.size());
-  Kokkos::View<const short *, Kokkos::HostSpace>  h_cmask(&cmask[0], cmask.size());
-  Kokkos::View<const int *, Kokkos::HostSpace>  h_c2z(c2z.data(), c2z.size());
-  Kokkos::View<const int *, Kokkos::HostSpace>  h_c2p(c2p.data(), c2p.size());
-  Kokkos::View<int *, Kokkos::HostSpace>  h_num_zone_pts(num_zone_pts.data(), num_zone_pts.size()); 
-  
+
+  Kokkos::View<Vec3 *, Kokkos::HostSpace> h_zcoord(&zcoord[0], zcoord.size());
+  Kokkos::View<const Vec3 *, Kokkos::HostSpace> h_pcoord(
+      &pcoord[0], pcoord.size());
+  Kokkos::View<const short *, Kokkos::HostSpace> h_cmask(
+      &cmask[0], cmask.size());
+  Kokkos::View<const int *, Kokkos::HostSpace> h_c2z(c2z.data(), c2z.size());
+  Kokkos::View<const int *, Kokkos::HostSpace> h_c2p(c2p.data(), c2p.size());
+  Kokkos::View<int *, Kokkos::HostSpace> h_num_zone_pts(
+      num_zone_pts.data(), num_zone_pts.size());
+
   using ExecSpace = Kokkos::HostSpace::execution_space;
 
-  Kokkos::parallel_for("VAR_zcoord-1", Kokkos::RangePolicy<ExecSpace>(0, cl),[&] (const int c) {
-    if (h_cmask(c)) {
-      int const z = h_c2z(c);
-      if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
-        h_zcoord(z) += h_pcoord(h_c2p(c));
-      }
-      else 
-      {
-        Kokkos::atomic_add(&h_zcoord(z),h_pcoord(h_c2p(c)));
-      }
-      h_num_zone_pts.access(z) += 1;
-    }
-  });
+  Kokkos::parallel_for(
+      "VAR_zcoord-1", Kokkos::RangePolicy<ExecSpace>(0, cl), [&](const int c) {
+        if (h_cmask(c)) {
+          int const z = h_c2z(c);
+          if (std::is_same_v<ExecSpace, Kokkos::Serial>) {
+            h_zcoord(z) += h_pcoord(h_c2p(c));
+          } else {
+            Kokkos::atomic_add(&h_zcoord(z), h_pcoord(h_c2p(c)));
+          }
+          h_num_zone_pts.access(z) += 1;
+        }
+      });
 
   auto const &zmask{zones().mask};
 
-  Kokkos::View<const short *, Kokkos::HostSpace>  h_zmask(&zmask[0], zmask.size());
-  
-  Kokkos::parallel_for("VAR_zcoord-2", Kokkos::RangePolicy<ExecSpace>(0, zl),[&] (const int z) {
-    if (h_zmask(z)) {
-      h_zcoord(z) /= static_cast<double>(h_num_zone_pts(z));
-    }
-  });
+  Kokkos::View<const short *, Kokkos::HostSpace> h_zmask(
+      &zmask[0], zmask.size());
+
+  Kokkos::parallel_for(
+      "VAR_zcoord-2", Kokkos::RangePolicy<ExecSpace>(0, zl), [&](const int z) {
+        if (h_zmask(z)) {
+          h_zcoord(z) /= static_cast<double>(h_num_zone_pts(z));
+        }
+      });
 
   zones().scatter(zcoord);
   VAR_INIT_EPILOGUE;
@@ -113,7 +117,7 @@ bool Zones::VAR_zone_to_pt_zone::init_() const {
   auto &z2pz = mydata_intrr();
   z2pz.init(zll);
   std::vector<std::set<int>> accum(zll);
-  
+
   /* Iterate over corners, add all zones attached to c2p[c] to c2z[z]; */
   for (int c = 0; c < cll; ++c) {
     int const p = c2p[c];
