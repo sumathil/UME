@@ -58,7 +58,7 @@ flag. Package-specific CMake options for UME include:
 
 ### Build command
 
-```
+```shell
 % cmake -B <build_dir> -DUSE_KOKKOS=ON -DUSE_MPI=ON -DCMAKE_BUILD_TYPE=Release
 % cmake --build <build_dir> -j 8      (equivalent to cd <build_dir> && make -j 8)
 ```

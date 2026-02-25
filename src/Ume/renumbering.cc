@@ -23,11 +23,7 @@ namespace Ume {
 using Mesh = SOA_Idx::Mesh;
 using INTV_T = DS_Types::INTV_T;
 
-enum OPS {
-  MIN = 1,
-  MAX,
-  NONE
-};
+enum OPS { MIN = 1, MAX, NONE };
 typedef int Op_t;
 
 /* Renumber_MeshMaps[RenumWaveMinMax]-->RenumWaveMinMax */
@@ -280,9 +276,8 @@ void renumber_s(Mesh &mesh) {
       /* Generate the new numbers. */
       int s_max = 0;
       INTV_T snew_to_snew2_map(sll, 0);
-      new_numbering(mesh.sides, mesh.points,
-                    s_to_p_map_new,
-                    s_max, snew_to_snew2_map);
+      new_numbering(
+          mesh.sides, mesh.points, s_to_p_map_new, s_max, snew_to_snew2_map);
 
       /* The first iteration translates X->XNEW and the second iteration
        * translates XNEW->XNEW2. The X->XNEW map contains both
@@ -308,7 +303,7 @@ void renumber_s(Mesh &mesh) {
       }
 
       op += 1;
-    } while(op <= MAX);
+    } while (op <= MAX);
   }
 
   /* Now that we have new local maps, we need to reshape db arrays for
@@ -319,7 +314,7 @@ void renumber_s(Mesh &mesh) {
   { /* ReshapeS() */
     /* Set masks to 1 or 0 depending on map value */
     INTV_T side_type_new(sll, 0);
-    for (int s: mesh.sides.all_indices()) {
+    for (int s : mesh.sides.all_indices()) {
       side_type_new[s] = std::max(0, std::min(s_to_snew_map[s], 1));
       s_to_snew_map[s] = std::abs(s_to_snew_map[s]);
     }
@@ -414,7 +409,7 @@ void renumber_z(Mesh &mesh) {
       int p = 0;
 
       if (MIN == op)
-        p = 2*mesh.points.size();
+        p = 2 * mesh.points.size();
 
       for (int z : mesh.zones.local_indices()) {
         z_to_p_map_new[z] = p;
@@ -443,9 +438,8 @@ void renumber_z(Mesh &mesh) {
       /* Generate the new numbers. */
       int z_max = 0;
       INTV_T znew_to_znew2_map(zll, 0);
-      new_numbering(mesh.zones, mesh.points,
-                    z_to_p_map_new,
-                    z_max, znew_to_znew2_map);
+      new_numbering(
+          mesh.zones, mesh.points, z_to_p_map_new, z_max, znew_to_znew2_map);
 
       /* The first iteration translates X->XNEW and the second iteration
        * translates XNEW->XNEW2. The X->XNEW map contains both
@@ -471,7 +465,7 @@ void renumber_z(Mesh &mesh) {
       }
 
       op += 1;
-    } while(op <= MAX);
+    } while (op <= MAX);
   }
 
   { /* ReshapeZ() */
@@ -522,9 +516,8 @@ void renumber_f(Mesh &mesh) {
 
       /* Generate the new numbers. */
       int f_max = 0;
-      new_numbering(mesh.faces, mesh.sides,
-                    f_to_s_map_new,
-                    f_max, f_to_fnew_map);
+      new_numbering(
+          mesh.faces, mesh.sides, f_to_s_map_new, f_max, f_to_fnew_map);
     }
   }
 
@@ -586,9 +579,8 @@ void renumber_e(Mesh &mesh) {
       /* Generate the new numbers. */
       int e_max = 0;
       INTV_T enew_to_enew2_map(ell, 0);
-      new_numbering(mesh.edges, mesh.points,
-                    e_to_p_map_new,
-                    e_max, enew_to_enew2_map);
+      new_numbering(
+          mesh.edges, mesh.points, e_to_p_map_new, e_max, enew_to_enew2_map);
 
       /* The first iteration translates X->XNEW and the second iteration
        * translates XNEW->XNEW2. The X->XNEW map contains both
@@ -603,7 +595,7 @@ void renumber_e(Mesh &mesh) {
       }
 
       op += 1;
-    } while(op <= MAX);
+    } while (op <= MAX);
   }
 
   { /* ReshapeE() */
@@ -641,9 +633,8 @@ void renumber_c(Mesh &mesh) {
 
       /* Generate the new numbers. */
       int c_max = 0;
-      new_numbering(mesh.corners, mesh.points,
-                    c_to_p_map,
-                    c_max, c_to_cnew_map);
+      new_numbering(
+          mesh.corners, mesh.points, c_to_p_map, c_max, c_to_cnew_map);
 
       if (cgl > 0) { // Set new ghost indices, if there are ghosts
         for (int cg : mesh.corners.ghost_indices_offset()) {
@@ -693,9 +684,7 @@ void renumber_a(Mesh &mesh) {
 
       /* Generate the new numbers. */
       int a_max = 0;
-      new_numbering(mesh.iotas, mesh.points,
-                    a_to_p_map,
-                    a_max, a_to_anew_map);
+      new_numbering(mesh.iotas, mesh.points, a_to_p_map, a_max, a_to_anew_map);
 
       if (agl > 0) { // Set new ghost indices, if there are ghosts
         for (int ag : mesh.iotas.ghost_indices_offset()) {

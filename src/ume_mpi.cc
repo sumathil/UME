@@ -44,8 +44,8 @@ using VEC3_T = typename Ume::DS_Types::VEC3_T;
 bool read_mesh(char const *const basename, int const mype, Mesh &mesh);
 bool test_point_gathscat(Mesh &mesh);
 void check_gradzatz_diffs(Mesh const &mesh, int const &centered_zone_index,
-                         VEC3V_T const &zgrad, VEC3V_T const &zgrad_invert,
-                         VEC3V_T const &pgrad, VEC3V_T const &pgrad_invert);
+    VEC3V_T const &zgrad, VEC3V_T const &zgrad_invert, VEC3V_T const &pgrad,
+    VEC3V_T const &pgrad_invert);
 
 int main(int argc, char *argv[]) {
   /* We will read in the mesh */
@@ -66,10 +66,10 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  size_t ic = 1; // set iteration count to 1 for default 
-  if(argc > 3 && std::string(argv[2])=="-i") {
-     ic=std::atoi(argv[3]);
-  } 
+  size_t ic = 1; // set iteration count to 1 for default
+  if (argc > 3 && std::string(argv[2]) == "-i") {
+    ic = std::atoi(argv[3]);
+  }
 
   /* This allows us to attach a debugger to a single rank specified in the
      UME_DEBUG_RANK environment variable. */
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
   Ume::Timer orig_time;
   Ume::gradzatz(mesh, zfield, zgrad, pgrad);
   orig_time.start();
-  for (size_t i=0;i<ic;i++) {
+  for (size_t i = 0; i < ic; i++) {
     Ume::gradzatz(mesh, zfield, zgrad, pgrad);
   }
   orig_time.stop();
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
   Ume::Timer invert_time;
   Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert);
   invert_time.start();
-  for (size_t i=0;i<ic;i++) {
+  for (size_t i = 0; i < ic; i++) {
     Ume::gradzatz_invert(mesh, zfield, zgrad_invert, pgrad_invert);
   }
   invert_time.stop();
@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
   Ume::Timer face_time;
   Ume::calc_face_area(mesh, face_area);
   face_time.start();
-  for (size_t i=0;i<ic;i++) {
+  for (size_t i = 0; i < ic; i++) {
     Ume::calc_face_area(mesh, face_area);
   }
   face_time.stop();
@@ -161,17 +161,18 @@ int main(int argc, char *argv[]) {
       Ume::Timer renumber_time;
       Ume::renumber_mesh(mesh);
       renumber_time.start();
-      for (size_t i=0;i<ic;i++) {
+      for (size_t i = 0; i < ic; i++) {
         Ume::renumber_mesh(mesh);
       }
       renumber_time.stop();
 
       if (comm.pe() == 0)
-        std::cout << "Renumbering algorithm took: " << renumber_time.seconds() << "s\n";
+        std::cout << "Renumbering algorithm took: " << renumber_time.seconds()
+                  << "s\n";
     } else {
       if (comm.pe() == 0)
         std::cout << "Iotas must be present in the mesh for renumbering."
-          << " Skipping renumbering..." << std::endl;
+                  << " Skipping renumbering..." << std::endl;
     }
   }
 
@@ -256,8 +257,8 @@ bool test_point_gathscat(Mesh &mesh) {
 }
 
 void check_gradzatz_diffs(Mesh const &mesh, int const &centered_zone_index,
-                         VEC3V_T const &zgrad, VEC3V_T const &zgrad_invert,
-                         VEC3V_T const &pgrad, VEC3V_T const &pgrad_invert) {
+    VEC3V_T const &zgrad, VEC3V_T const &zgrad_invert, VEC3V_T const &pgrad,
+    VEC3V_T const &pgrad_invert) {
   auto const &kztyp = mesh.zones.mask;
 
   if (zgrad != zgrad_invert) {
@@ -296,16 +297,20 @@ void check_gradzatz_diffs(Mesh const &mesh, int const &centered_zone_index,
   std::sort(grad_zones.begin(), grad_zones.end());
   std::sort(grad_points.begin(), grad_points.end());
   std::vector<int> diff;
-  std::ranges::set_difference(grad_zones, z2pz[centered_zone_index], std::back_inserter(diff));
+  std::ranges::set_difference(
+      grad_zones, z2pz[centered_zone_index], std::back_inserter(diff));
   if (!diff.empty()) {
     std::cout << "PE" << mesh.mype << " zone diff " << diff.size() << " found "
-              << grad_zones.size() << " expected " << z2pz.size(centered_zone_index) << '\n';
+              << grad_zones.size() << " expected "
+              << z2pz.size(centered_zone_index) << '\n';
   }
 
   diff.clear();
-  std::ranges::set_difference(grad_points, z2p[centered_zone_index], std::back_inserter(diff));
+  std::ranges::set_difference(
+      grad_points, z2p[centered_zone_index], std::back_inserter(diff));
   if (!diff.empty()) {
     std::cout << "PE" << mesh.mype << " pt diff " << diff.size() << " found "
-              << grad_points.size() << " expected " << z2p.size(centered_zone_index) << '\n';
+              << grad_points.size() << " expected "
+              << z2p.size(centered_zone_index) << '\n';
   }
 }

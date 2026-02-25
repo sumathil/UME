@@ -168,7 +168,7 @@ void stitch(Ume::SOA_Idx::Mesh &mesh, const int dim) {
   //! ----- Zones -----
   // Double Number of Zones
   int original_zones_total = mesh.zones.size();
-  //int new_zones_total = original_zones_total * 2;
+  // int new_zones_total = original_zones_total * 2;
   double_entity_count(mesh.zones);
 
   //! ----- Edges -----
